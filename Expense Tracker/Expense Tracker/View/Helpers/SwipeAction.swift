@@ -73,9 +73,6 @@ struct SwipeAction<Content: View>: View {
                 .opacity(scrollOffset == .zero ? 0 : 1)
             }
             .scrollTargetLayout()
-            .visualEffect { content, geometryProxy in
-                content.offset(x: MainActor.assumeIsolated { scrollOffset(geometryProxy) })
-            }
         }
     }
     
