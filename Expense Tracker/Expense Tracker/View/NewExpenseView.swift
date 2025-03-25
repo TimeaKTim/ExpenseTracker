@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import WidgetKit
 
 struct NewExpenseView: View {
     /// Env Properties
@@ -122,6 +123,8 @@ struct NewExpenseView: View {
         }
         /// Dismissing View
         dismiss()
+        /// Updating Widgets
+        WidgetCenter.shared.reloadAllTimelines()
     }
     
     @ViewBuilder
