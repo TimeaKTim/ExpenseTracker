@@ -7,6 +7,7 @@
 
 import SwiftUI
 import WidgetKit
+import UniformTypeIdentifiers
 
 struct NewExpenseView: View {
     /// Env Properties
@@ -19,6 +20,7 @@ struct NewExpenseView: View {
     @State private var amount: Double = .zero
     @State private var dateAdded: Date = .now
     @State private var category: Category = .expense
+    @State private var isPresented: Bool = false
     /// Random Tint
     @State var tint: TintColor = tints.randomElement()!
     var body: some View {
@@ -86,6 +88,28 @@ struct NewExpenseView: View {
         .navigationTitle("\(editTransaction == nil ? "Add" : "Edit") Transaction")
         .background(.gray.opacity(0.15))
         .toolbar(content: {
+            ToolbarItem(placement: .topBarLeading){
+                Button {
+                    isPresented.toggle()
+                } label: {
+                    Label("Import", systemImage: "square.and.arrow.down")
+                }
+                .fileImporter(isPresented: $isPresented, allowedContentTypes: [UTType.commaSeparatedText]) { result in
+                    switch result {
+                    case .success(let url):
+                        guard url.startAccessingSecurityScopedResource() else { return }
+                        do {
+                            let content = try String(contentsOf: url, encoding: .utf8)
+                            print("File content: \(content)")
+                        } catch {
+                            print("Error reading file: \(error)")
+                        }
+                        url.stopAccessingSecurityScopedResource()
+                    case .failure(let error):
+                        print("Error loading file: \(error)")
+                    }
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save", action: save)
             }
