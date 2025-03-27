@@ -15,46 +15,64 @@ struct Search: View {
     @State private var selectedCategory: Category? = nil
     let searchPublisher = PassthroughSubject<String, Never>()
     var body: some View {
-        NavigationStack{
-            ScrollView(.vertical){
+        NavigationStack {
+            ScrollView(.vertical) {
                 LazyVStack(spacing: 12) {
-                    FilterTransactionsView(category: selectedCategory, searchText: filterText) { transactions in
-                        ForEach(transactions){ transaction in
-                            NavigationLink {
-                                NewExpenseView(editTransaction: transaction)
-                            } label: {
-                                TransactionCardView(transaction: transaction, showCategory: true)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
+                    transactionsList()
                 }
                 .padding(15)
             }
-            .overlay(content: {
-                ContentUnavailableView("Search Transactions", systemImage: "magnifyingglass")
-                    .opacity(filterText.isEmpty ? 1 : 0)
-            })
-            .onChange(of: searchText, { oldValue, newValue in
-                if newValue.isEmpty {
-                    filterText = ""
-                }
-                searchPublisher.send(newValue)
-            })
-            .onReceive(searchPublisher.debounce(for: .seconds(0.3), scheduler: DispatchQueue.main), perform: { text in
+            .overlay { searchOverlay() }
+            .searchable(text: $searchText)
+            .background(.gray.opacity(0.15))
+            .navigationTitle("Search")
+            .toolbar { searchToolbar() }
+            .onChange(of: searchText) { oldValue, newValue in
+                handleSearchTextChange(newValue)
+            }
+            .onReceive(searchPublisher.debounce(for: .seconds(0.3), scheduler: DispatchQueue.main)) { text in
                 filterText = text
                 print(text)
-            })
-            .searchable(text: $searchText)
-            .navigationTitle("Search")
-            .background(.gray.opacity(0.15))
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    ToolBarContent()
-                }
             }
         }
     }
+
+    @ViewBuilder
+    private func transactionsList() -> some View {
+        FilterTransactionsView(category: selectedCategory, searchText: filterText) { transactions in
+            ForEach(transactions) { transaction in
+                NavigationLink {
+                    NewExpenseView(editTransaction: transaction, csvViewModel: CSVViewModel())
+                } label: {
+                    TransactionCardView(transaction: transaction, showCategory: true)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func searchOverlay() -> some View {
+        if filterText.isEmpty {
+            ContentUnavailableView("Search Transactions", systemImage: "magnifyingglass")
+                .opacity(1)
+        }
+    }
+
+    @ToolbarContentBuilder
+    private func searchToolbar() -> some ToolbarContent {
+        ToolbarItem(placement: .topBarTrailing) {
+            ToolBarContent()
+        }
+    }
+
+    private func handleSearchTextChange(_ newValue: String) {
+        if newValue.isEmpty {
+            filterText = ""
+        }
+        searchPublisher.send(newValue)
+    }
+
     
     @ViewBuilder
     func ToolBarContent() -> some View {

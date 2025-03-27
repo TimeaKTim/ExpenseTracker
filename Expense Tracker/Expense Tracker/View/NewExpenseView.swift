@@ -21,6 +21,9 @@ struct NewExpenseView: View {
     @State private var dateAdded: Date = .now
     @State private var category: Category = .expense
     @State private var isPresented: Bool = false
+    @State private var showHeaders = false
+
+    @ObservedObject var csvViewModel: CSVViewModel
     /// Random Tint
     @State var tint: TintColor = tints.randomElement()!
     var body: some View {
@@ -95,19 +98,7 @@ struct NewExpenseView: View {
                     Label("Import", systemImage: "square.and.arrow.down")
                 }
                 .fileImporter(isPresented: $isPresented, allowedContentTypes: [UTType.commaSeparatedText]) { result in
-                    switch result {
-                    case .success(let url):
-                        guard url.startAccessingSecurityScopedResource() else { return }
-                        do {
-                            let content = try String(contentsOf: url, encoding: .utf8)
-                            print("File content: \(content)")
-                        } catch {
-                            print("Error reading file: \(error)")
-                        }
-                        url.stopAccessingSecurityScopedResource()
-                    case .failure(let error):
-                        print("Error loading file: \(error)")
-                    }
+                    csvViewModel.handleFileImport(for: result, context: context)
                 }
             }
             ToolbarItem(placement: .topBarTrailing) {
@@ -213,6 +204,6 @@ struct NewExpenseView: View {
 
 #Preview {
     NavigationStack{
-        NewExpenseView()
+        NewExpenseView(csvViewModel: CSVViewModel())
     }
 }

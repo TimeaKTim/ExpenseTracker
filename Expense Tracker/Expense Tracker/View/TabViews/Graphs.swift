@@ -203,7 +203,7 @@ struct ListOfExpenses: View {
     
     private func transactionLink(_ transaction: Transaction) -> some View {
         NavigationLink {
-            NewExpenseView(editTransaction: transaction)
+            NewExpenseView(editTransaction: transaction, csvViewModel: CSVViewModel())
         } label: {
             TransactionCardView(transaction: transaction)
         }

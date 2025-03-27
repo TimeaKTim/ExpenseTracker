@@ -19,44 +19,13 @@ struct Recents: View {
     /// For Animation
     @Namespace private var animation
     var body: some View {
-        GeometryReader {
-            /// For Animation Purpose
-            let size = $0.size
-            
+        GeometryReader { proxy in
+            let size = proxy.size
+
             NavigationStack {
                 ScrollView(.vertical) {
                     LazyVStack(spacing: 10, pinnedViews: [.sectionHeaders]) {
-                        Section {
-                            /// Date Filter Button
-                            Button(action:{
-                                showFilterView = true
-                            }, label: {
-                                Text("\(format(date: startDate, format: "dd - MMM yy")) to \(format(date: endDate, format: "dd - MMM yy"))")
-                                    .font(.caption)
-                                    .foregroundStyle(.gray)
-                            })
-                            .hSpacing(.leading)
-                            
-                            FilterTransactionsView(satrtDate: startDate, endDate: endDate){transactions in
-                                /// Card View
-                                CardView(
-                                    income: total(transactions, category: .income),
-                                    expense: total(transactions, category: .expense)
-                                 )
-                                /// Custom Segmented Control
-                                CustomSegmentedControl()
-                                    .padding(.bottom, 10)
-                                
-                                ForEach(transactions.filter({$0.category == selectedCategory.rawValue})){ transaction in
-                                    NavigationLink(value: transaction){
-                                        TransactionCardView(transaction: transaction)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        } header: {
-                            HeaderView(size)
-                        }
+                        transactionsSection(size)
                     }
                     .padding(15)
                 }
@@ -64,24 +33,75 @@ struct Recents: View {
                 .blur(radius: showFilterView ? 8 : 0)
                 .disabled(showFilterView)
                 .navigationDestination(for: Transaction.self) { transaction in
-                    NewExpenseView(editTransaction: transaction)
+                    NewExpenseView(editTransaction: transaction, csvViewModel: CSVViewModel())
                 }
             }
-            .overlay {
-                if showFilterView {
-                    DateFilterView(start: startDate, end: endDate, onSubmit: { start, end in
-                        startDate = start
-                        endDate = end
-                        showFilterView = false
-                    }, onClose: {
-                        showFilterView = false
-                    })
-                    .transition(.move(edge: .leading))
-                }
-            }
+            .overlay { filterOverlay() }
             .animation(.snappy, value: showFilterView)
         }
     }
+
+    @ViewBuilder
+    private func transactionsSection(_ size: CGSize) -> some View {
+        Section {
+            dateFilterButton()
+            filteredTransactionsView()
+        } header: {
+            HeaderView(size)
+        }
+    }
+
+    private func dateFilterButton() -> some View {
+        Button(action: {
+            showFilterView = true
+        }) {
+            Text("\(format(date: startDate, format: "dd - MMM yy")) to \(format(date: endDate, format: "dd - MMM yy"))")
+                .font(.caption)
+                .foregroundStyle(.gray)
+        }
+        .hSpacing(.leading)
+    }
+
+    private func filteredTransactionsView() -> some View {
+        FilterTransactionsView(satrtDate: startDate, endDate: endDate) { transactions in
+            VStack {
+                CardView(
+                    income: total(transactions, category: .income),
+                    expense: total(transactions, category: .expense)
+                )
+                
+                CustomSegmentedControl()
+                    .padding(.bottom, 10)
+                
+                ForEach(transactions.filter { $0.category == selectedCategory.rawValue }) { transaction in
+                    NavigationLink(value: transaction) {
+                        TransactionCardView(transaction: transaction)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func filterOverlay() -> some View {
+        if showFilterView {
+            DateFilterView(
+                start: startDate,
+                end: endDate,
+                onSubmit: { start, end in
+                    startDate = start
+                    endDate = end
+                    showFilterView = false
+                },
+                onClose: {
+                    showFilterView = false
+                }
+            )
+            .transition(.move(edge: .leading))
+        }
+    }
+
     
     /// Header View
     @ViewBuilder
@@ -107,7 +127,7 @@ struct Recents: View {
             Spacer(minLength: 0)
 
             NavigationLink {
-                NewExpenseView()
+                NewExpenseView(csvViewModel: CSVViewModel())
             } label: {
                 Image(systemName: "plus")
                     .font(.title3)
