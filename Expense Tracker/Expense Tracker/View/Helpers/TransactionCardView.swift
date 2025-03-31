@@ -29,6 +29,10 @@ struct TransactionCardView: View {
                         .font(.callout)
                         .foregroundStyle(Color.primary.secondary)
                     
+                    Text(transaction.shopCategory)
+                        .font(.callout)
+                        .foregroundStyle(Color.primary.secondary)
+                    
                     Text(format(date: transaction.dateAdded, format: "dd MMM yyyy"))
                         .font(.caption2)
                         .foregroundStyle(.gray)

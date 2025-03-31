@@ -20,10 +20,11 @@ struct NewExpenseView: View {
     @State private var amount: Double = .zero
     @State private var dateAdded: Date = .now
     @State private var category: Category = .expense
-    @State private var selectedShopCategory: ShopCategory? = nil
+    @State private var shopCategory: String = "Select a category"
     @State private var isPresented: Bool = false
     @State private var showHeaders = false
-    @State private var customCategoryInput: String = ""
+    @State private var showAddCategoryPopup = false
+    @State private var newCategoryName = ""
 
     @ObservedObject var csvViewModel: CSVViewModel
     @StateObject private var shopCategoryViewModel = ShopCategoryViewModel()
@@ -44,6 +45,7 @@ struct NewExpenseView: View {
                     amount: amount,
                     dateAdded: dateAdded,
                     category: category,
+                    shopCategory: shopCategory.isEmpty ? "Category" : shopCategory,
                     tintColor: tint))
                 
                 CustomSection("Title", "Magic Keyboard", value: $title)
@@ -82,11 +84,11 @@ struct NewExpenseView: View {
                             .hSpacing(.leading)
                         
                         if !shopCategoryViewModel.categories.isEmpty {
-                            Picker("Select Category", selection: $selectedShopCategory) {
-                                Text("Select Category").tag(nil as ShopCategory?)
+                            Picker("Select Category", selection: $shopCategory) {
+                                Text("Select a category").tag("Select a category")
                                 
                                 ForEach(shopCategoryViewModel.categories) { category in
-                                    Text(category.name).tag(category as ShopCategory?)
+                                    Text(category.name).tag(category.name)
                                 }
                             }
                             .pickerStyle(MenuPickerStyle())
@@ -101,8 +103,12 @@ struct NewExpenseView: View {
                     }
                     .onAppear {
                         shopCategoryViewModel.fetchCategories()
-                        if let firstCategory = shopCategoryViewModel.categories.first {
-                            selectedShopCategory = firstCategory
+                    }
+                    .onChange(of: shopCategory) { newValue, _ in
+                        if newValue != "Select a category" {
+                            print("Category selected: \(newValue)")
+                        } else {
+                            print("No category selected")
                         }
                     }
                     
@@ -112,13 +118,57 @@ struct NewExpenseView: View {
                             .foregroundStyle(.gray)
                             .hSpacing(.leading)
                         
-                        TextField("Enter custom", text: $customCategoryInput)
-                            .padding(.horizontal, 15)
-                            .padding(.vertical, 12)
-                            .background(.background, in: .rect(cornerRadius: 10))
+                        Button(action: {
+                            showAddCategoryPopup = true
+                        }) {
+                            Text("Add Custom Category")
+                                .foregroundColor(Color.accentColor)
+                                .padding(.horizontal, 15)
+                                .padding(.vertical, 12)
+                                .background(.background, in: .rect(cornerRadius: 10))
+                        }
+                        .sheet(isPresented: $showAddCategoryPopup) {
+                            VStack(spacing: 20) {
+                                Text("Add New Category")
+                                    .font(.title)
+                                    .padding()
+                                
+                                TextField("Enter category name", text: $newCategoryName)
+                                    .textFieldStyle(RoundedBorderTextFieldStyle())
+                                    .padding()
+                                
+                                HStack {
+                                    Button("Cancel") {
+                                        showAddCategoryPopup = false
+                                        newCategoryName = ""
+                                    }
+                                    .padding()
+                                    .background(Color.gray)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(10)
+                                    
+                                    Button("Save") {
+                                        if !newCategoryName.isEmpty {
+                                            let newCategory = ShopCategory(name: newCategoryName)
+                                            showAddCategoryPopup = false
+                                            newCategoryName = ""
+                                            
+                                            shopCategoryViewModel.addCategoryToDatabase(newCategory)
+                                        }
+                                    }
+                                    .padding()
+                                    .background(Color.green)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(10)
+                                }
+                                .padding()
+                            }
+                            .padding()
+                        }
+
                     }
                 }
-                
+
                 /// Date Picker
                 VStack(alignment: .leading, spacing: 10, content: {
                     Text("Date")
@@ -178,9 +228,11 @@ struct NewExpenseView: View {
             editTransaction?.amount = amount
             editTransaction?.dateAdded = dateAdded
             editTransaction?.category = category.rawValue
+            editTransaction?.shopCategory = shopCategory
             return
         } else {
-            let transaction = Transaction(title: title, remarks: remarks, amount: amount, dateAdded: dateAdded, category: category, tintColor: tint)
+            print(shopCategory)
+            let transaction = Transaction(title: title, remarks: remarks, amount: amount, dateAdded: dateAdded, category: category, shopCategory: shopCategory, tintColor: tint)
             context.insert(transaction)
         }
         /// Dismissing View

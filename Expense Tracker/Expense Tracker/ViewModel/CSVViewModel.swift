@@ -67,10 +67,10 @@ class CSVViewModel: ObservableObject {
                         amount: amount,
                         dateAdded: date,
                         category: category,
+                        shopCategory: "",
                         tintColor: tint
                     )
 
-                    // Ellenőrzés, hogy már létezik-e ilyen tranzakció
                     let isDuplicate = existingTransactions.contains { existing in
                         existing.title == newTransaction.title &&
                         existing.amount == newTransaction.amount &&

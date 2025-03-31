@@ -21,24 +21,35 @@ class ShopCategoryViewModel: ObservableObject {
                 }
                 
                 if let snapshot = snapshot {
-                    print("Found \(snapshot.documents.count) categories.")
-                    
                     self.categories = snapshot.documents.compactMap { document in
-                        print("Document data for \(document.documentID): \(document.data())")
-                        
                         do {
                             let category = try document.data(as: ShopCategory.self)
-                            print("Successfully decoded category: \(category)")
                             return category
                         } catch {
                             print("Error parsing category for document \(document.documentID): \(error.localizedDescription)")
                             return nil
                         }
                     }
-                    
-                    print("Categories loaded: \(self.categories)")
                 }
             }
+    }
+    
+    func addCategoryToDatabase(_ category: ShopCategory) {
+        do {
+            let _ = try db.collection("Category").addDocument(from: category) { error in
+                if let error = error {
+                    print("Error adding category: \(error.localizedDescription)")
+                } else {
+                    print("Category successfully added!")
+                    
+                    DispatchQueue.main.async {
+                        self.categories.append(category)
+                    }
+                }
+            }
+        } catch {
+            print("Error encoding category: \(error.localizedDescription)")
+        }
     }
 }
 

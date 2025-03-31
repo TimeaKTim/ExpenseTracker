@@ -16,14 +16,16 @@ class Transaction {
     var amount: Double
     var dateAdded: Date
     var category: String
+    var shopCategory: String
     var tintColor: String
     
-    init(title: String, remarks: String, amount: Double, dateAdded: Date, category: Category, tintColor: TintColor){
+    init(title: String, remarks: String, amount: Double, dateAdded: Date, category: Category, shopCategory: String, tintColor: TintColor){
         self.title = title
         self.remarks = remarks
         self.amount = amount
         self.dateAdded = dateAdded
         self.category = category.rawValue
+        self.shopCategory = shopCategory
         self.tintColor = tintColor.color
     }
     

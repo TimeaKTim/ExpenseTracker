@@ -7,7 +7,7 @@
 
 import FirebaseFirestore
 
-struct ShopCategory: Identifiable, Decodable, Hashable {
+struct ShopCategory: Identifiable, Encodable, Decodable, Hashable {
     @DocumentID var id: String?
     var name: String
     
