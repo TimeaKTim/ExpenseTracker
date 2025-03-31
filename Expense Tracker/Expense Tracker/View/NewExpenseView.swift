@@ -20,15 +20,18 @@ struct NewExpenseView: View {
     @State private var amount: Double = .zero
     @State private var dateAdded: Date = .now
     @State private var category: Category = .expense
+    @State private var selectedShopCategory: ShopCategory? = nil
     @State private var isPresented: Bool = false
     @State private var showHeaders = false
+    @State private var customCategoryInput: String = ""
 
     @ObservedObject var csvViewModel: CSVViewModel
+    @StateObject private var shopCategoryViewModel = ShopCategoryViewModel()
     /// Random Tint
     @State var tint: TintColor = tints.randomElement()!
     var body: some View {
-        ScrollView(.vertical){
-            VStack(spacing: 15){
+        ScrollView(.vertical) {
+            VStack(spacing: 15) {
                 Text("Preview")
                     .font(.caption)
                     .foregroundStyle(.gray)
@@ -67,10 +70,54 @@ struct NewExpenseView: View {
                         .background(.background, in: .rect(cornerRadius: 10))
                         .frame(maxWidth: 130)
                         
-                        /// Custom Check Box
                         CategoryCheckBox()
                     }
                 })
+                
+                HStack(spacing: 15) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Category")
+                            .font(.caption)
+                            .foregroundStyle(.gray)
+                            .hSpacing(.leading)
+                        
+                        if !shopCategoryViewModel.categories.isEmpty {
+                            Picker("Select Category", selection: $selectedShopCategory) {
+                                Text("Select Category").tag(nil as ShopCategory?)
+                                
+                                ForEach(shopCategoryViewModel.categories) { category in
+                                    Text(category.name).tag(category as ShopCategory?)
+                                }
+                            }
+                            .pickerStyle(MenuPickerStyle())
+                            .padding(.horizontal, 15)
+                            .padding(.vertical, 12)
+                            .background(.background, in: .rect(cornerRadius: 10))
+                        } else {
+                            Text("Loading categories...")
+                                .padding()
+                                .foregroundColor(.gray)
+                        }
+                    }
+                    .onAppear {
+                        shopCategoryViewModel.fetchCategories()
+                        if let firstCategory = shopCategoryViewModel.categories.first {
+                            selectedShopCategory = firstCategory
+                        }
+                    }
+                    
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Custom Category")
+                            .font(.caption)
+                            .foregroundStyle(.gray)
+                            .hSpacing(.leading)
+                        
+                        TextField("Enter custom", text: $customCategoryInput)
+                            .padding(.horizontal, 15)
+                            .padding(.vertical, 12)
+                            .background(.background, in: .rect(cornerRadius: 10))
+                    }
+                }
                 
                 /// Date Picker
                 VStack(alignment: .leading, spacing: 10, content: {

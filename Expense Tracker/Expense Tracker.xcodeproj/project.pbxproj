@@ -7,10 +7,15 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		2697B1862D9AAAEB0060020B /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 2697B1852D9AAAEB0060020B /* FirebaseAnalytics */; };
+		2697B18E2D9AB13D0060020B /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 2697B18D2D9AB13D0060020B /* FirebaseFirestore */; };
 		26A3A2FF2D92E55B0024CCBD /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 26A3A2FE2D92E55B0024CCBD /* WidgetKit.framework */; };
 		26A3A3012D92E55B0024CCBD /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 26A3A3002D92E55B0024CCBD /* SwiftUI.framework */; };
 		26A3A30E2D92E55D0024CCBD /* StatsCardViewExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 26A3A2FC2D92E55B0024CCBD /* StatsCardViewExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		26A7C5BB2D9575FD00CB0AC9 /* SwiftCSV in Frameworks */ = {isa = PBXBuildFile; productRef = 26A7C5BA2D9575FD00CB0AC9 /* SwiftCSV */; };
+		26D49A612D9AB2D400629014 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 26D49A602D9AB2D400629014 /* FirebaseCore */; };
+		26D49A632D9AB3DE00629014 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = 26D49A622D9AB3DE00629014 /* FirebaseCore */; };
+		26D49A652D9AB3DE00629014 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 26D49A642D9AB3DE00629014 /* FirebaseFirestore */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -61,6 +66,7 @@
 				"Helpers/View+Extensions.swift",
 				Model/Category.swift,
 				Model/CSVHeader.swift,
+				Model/ShopCategory.swift,
 				Model/TintColor.swift,
 				Model/Transaction.swift,
 				View/Helpers/CardView.swift,
@@ -94,7 +100,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				2697B1862D9AAAEB0060020B /* FirebaseAnalytics in Frameworks */,
 				26A7C5BB2D9575FD00CB0AC9 /* SwiftCSV in Frameworks */,
+				26D49A612D9AB2D400629014 /* FirebaseCore in Frameworks */,
+				2697B18E2D9AB13D0060020B /* FirebaseFirestore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -103,6 +112,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				26A3A3012D92E55B0024CCBD /* SwiftUI.framework in Frameworks */,
+				26D49A652D9AB3DE00629014 /* FirebaseFirestore in Frameworks */,
+				26D49A632D9AB3DE00629014 /* FirebaseCore in Frameworks */,
 				26A3A2FF2D92E55B0024CCBD /* WidgetKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -162,6 +173,9 @@
 			name = "Expense Tracker";
 			packageProductDependencies = (
 				26A7C5BA2D9575FD00CB0AC9 /* SwiftCSV */,
+				2697B1852D9AAAEB0060020B /* FirebaseAnalytics */,
+				2697B18D2D9AB13D0060020B /* FirebaseFirestore */,
+				26D49A602D9AB2D400629014 /* FirebaseCore */,
 			);
 			productName = "Expense Tracker";
 			productReference = 2659E56E2D5A244800F74CFF /* Expense Tracker.app */;
@@ -184,6 +198,8 @@
 			);
 			name = StatsCardViewExtension;
 			packageProductDependencies = (
+				26D49A622D9AB3DE00629014 /* FirebaseCore */,
+				26D49A642D9AB3DE00629014 /* FirebaseFirestore */,
 			);
 			productName = StatsCardViewExtension;
 			productReference = 26A3A2FC2D92E55B0024CCBD /* StatsCardViewExtension.appex */;
@@ -218,6 +234,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				26A7C5B92D9575FD00CB0AC9 /* XCRemoteSwiftPackageReference "SwiftCSV" */,
+				2697B1842D9AAAEB0060020B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 2659E56F2D5A244800F74CFF /* Products */;
@@ -553,6 +570,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		2697B1842D9AAAEB0060020B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.10.0;
+			};
+		};
 		26A7C5B92D9575FD00CB0AC9 /* XCRemoteSwiftPackageReference "SwiftCSV" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/swiftcsv/SwiftCSV.git";
@@ -564,10 +589,35 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		2697B1852D9AAAEB0060020B /* FirebaseAnalytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2697B1842D9AAAEB0060020B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAnalytics;
+		};
+		2697B18D2D9AB13D0060020B /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2697B1842D9AAAEB0060020B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
 		26A7C5BA2D9575FD00CB0AC9 /* SwiftCSV */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 26A7C5B92D9575FD00CB0AC9 /* XCRemoteSwiftPackageReference "SwiftCSV" */;
 			productName = SwiftCSV;
+		};
+		26D49A602D9AB2D400629014 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2697B1842D9AAAEB0060020B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		26D49A622D9AB3DE00629014 /* FirebaseCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2697B1842D9AAAEB0060020B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseCore;
+		};
+		26D49A642D9AB3DE00629014 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 2697B1842D9AAAEB0060020B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

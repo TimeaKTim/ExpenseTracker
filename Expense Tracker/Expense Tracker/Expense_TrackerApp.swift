@@ -7,9 +7,14 @@
 
 import SwiftUI
 import WidgetKit
+import Firebase
 
 @main
 struct Expense_TrackerApp: App {
+    init() {
+            FirebaseApp.configure()
+    }
+    
     var body: some Scene {
         WindowGroup {
             ContentView()

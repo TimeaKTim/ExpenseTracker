@@ -42,35 +42,26 @@ class CSVViewModel: ObservableObject {
     func parseCSV(content: String, context: ModelContext) {
         do {
             let data = try EnumeratedCSV(string: content, loadColumns: false)
-            
+
             self.headers = CSVHeader.createHeaders(data: data.header)
-            self.rows = data.rows.map({ CSVRow(cells: $0.map({ CSVCell(content: $0) })) })
-            
+            self.rows = data.rows.map { CSVRow(cells: $0.map { CSVCell(content: $0) }) }
+
+            // Meglévő tranzakciók lekérdezése
+            let existingTransactions = fetchAllTransactions(context: context)
+
             for row in self.rows {
                 let dateString = row.cells[3].content
-                print(dateString)
 
                 if let date = convertToDate(dateString: dateString) {
-                    let formattedDate = formatDate(date: date)
-                    print(formattedDate)
-                    
                     let title = row.cells[4].content
-                    
+
                     var amount = Double(row.cells[5].content)!
-                    let category: Category
-                    if amount < 0 {
-                        category = .expense
-                    } else {
-                        category = .income
-                    }
-                    
+                    let category: Category = amount < 0 ? .expense : .income
+
                     let fee = Double(row.cells[6].content)!
-                    amount = abs(amount)
-                    amount += fee
-                    
-//                    let currency = row.cells[7].content
-                    
-                    let transaction = Transaction(
+                    amount = abs(amount) + fee
+
+                    let newTransaction = Transaction(
                         title: title,
                         remarks: "",
                         amount: amount,
@@ -78,19 +69,29 @@ class CSVViewModel: ObservableObject {
                         category: category,
                         tintColor: tint
                     )
-                    
-                    print(fetchAllTransactions(context: context))
-                    
-                    context.insert(transaction)
+
+                    // Ellenőrzés, hogy már létezik-e ilyen tranzakció
+                    let isDuplicate = existingTransactions.contains { existing in
+                        existing.title == newTransaction.title &&
+                        existing.amount == newTransaction.amount &&
+                        existing.dateAdded == newTransaction.dateAdded &&
+                        existing.category == newTransaction.category
+                    }
+
+                    if !isDuplicate {
+                        context.insert(newTransaction)
+                    } else {
+                        print("Duplicate transaction found, skipping: \(newTransaction)")
+                    }
                 } else {
                     print("Invalid date format")
                 }
             }
-            
         } catch {
             print(error)
         }
     }
+
     
     func fetchAllTransactions(context: ModelContext) -> [Transaction] {
         // Create a FetchDescriptor to get all Transaction entries
