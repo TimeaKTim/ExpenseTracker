@@ -9,7 +9,7 @@ import SwiftUI
 import SwiftData
 
 @Model
-class Transaction {
+class Transaction: @unchecked Sendable {
     /// Properties
     var title: String
     var remarks: String

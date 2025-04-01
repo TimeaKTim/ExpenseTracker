@@ -197,7 +197,11 @@ struct NewExpenseView: View {
                 .fileImporter(isPresented: $isPresented, allowedContentTypes: [UTType.commaSeparatedText]) { result in
                     csvViewModel.handleFileImport(for: result, context: context)
                 }
+                .popover(isPresented: $csvViewModel.isCategoryPickerPresented) {
+                            CategoryPickerView(viewModel: csvViewModel)
+                }
             }
+           
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Save", action: save)
             }
