@@ -10,6 +10,7 @@ import Combine
 
 class ShopCategoryViewModel: ObservableObject {
     @Published var categories: [ShopCategory] = []
+    @Published var shops: [Shop] = []
     private var db = Firestore.firestore()
     
     func fetchCategories() {
@@ -35,10 +36,24 @@ class ShopCategoryViewModel: ObservableObject {
             }
     }
     
-    func fetchCategory(title: String) {
-        db.collection("Stores")
+    func fetchStoreByTitle(title: String) async -> Shop? {
+        do {
+            let snapshot = try await db.collection("Shops")
+                .whereField("title", isEqualTo: title)
+                .limit(to: 1)
+                .getDocuments()
+            
+            if let document = snapshot.documents.first {
+                return try document.data(as: Shop.self)
+            } else {
+                return nil
+            }
+        } catch {
+            print("❌ Error fetching store: \(error.localizedDescription)")
+            return nil
+        }
     }
-    
+
     func addCategoryToDatabase(_ category: ShopCategory) {
         do {
             let _ = try db.collection("Category").addDocument(from: category) { error in
@@ -54,6 +69,24 @@ class ShopCategoryViewModel: ObservableObject {
             }
         } catch {
             print("Error encoding category: \(error.localizedDescription)")
+        }
+    }
+
+    @MainActor
+    func saveShopsToDatabase(_ shops: Set<Shop>) async {
+        for shop in shops {
+            do {
+                let existingShop = await fetchStoreByTitle(title: shop.title.lowercased())
+
+                if existingShop == nil {
+                    try db.collection("Shops").addDocument(from: shop)
+                    print("✅ Shop added to database: \(shop.title)")
+                } else {
+                    print("⚠️ Shop already exists: \(shop.title) - Skipping insertion")
+                }
+            } catch {
+                print("❌ Error saving shop: \(error.localizedDescription)")
+            }
         }
     }
 }

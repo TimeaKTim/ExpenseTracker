@@ -10,14 +10,15 @@ import SwiftCSV
 import SwiftData
 import Foundation
 
-class CSVViewModel: ObservableObject {
+class CSVViewModel: ObservableObject, @unchecked Sendable {
     @Published var content: String = ""
     @Published var headers: [CSVHeader] = []
     @Published var rows: [CSVRow] = []
-    @Published var transactions: [Transaction] = []  // Store all parsed transactions here
+    @Published var transactions: [Transaction] = []
     @Published var selectedTransaction: Transaction? = nil
     @Published var isCategoryPickerPresented: Bool = false
-    @Published var categoryToAssign: Category? = nil // Store the selected category for each transaction
+    @Published var categoryToAssign: Category? = nil
+    @Published var shopViewModel = ShopCategoryViewModel()
     
     @State var tint: TintColor = tints.randomElement()!
     
@@ -34,35 +35,65 @@ class CSVViewModel: ObservableObject {
         guard url.startAccessingSecurityScopedResource() else { return }
         
         do {
-            let content = try String(contentsOf: url, encoding: .utf8)
-            self.content = content
-            parseCSV(content: content, context: context)
-        } catch {
-            print("Error reading file: \(error)")
+            let possibleEncodings: [String.Encoding] = [.utf8, .isoLatin1, .windowsCP1252]
+            var content: String? = nil
+
+            for encoding in possibleEncodings {
+                if let decoded = try? String(contentsOf: url, encoding: encoding) {
+                    content = decoded
+                    break
+                }
+            }
+            
+            guard let validContent = content else {
+                print("❌ Error: Could not decode file with supported encodings.")
+                return
+            }
+            
+            self.content = validContent
+            Task {
+                await parseCSV(content: validContent, context: context)
+            }
         }
         
         url.stopAccessingSecurityScopedResource()
     }
+
     
-    func parseCSV(content: String, context: ModelContext) {
+    @MainActor
+    func parseCSV(content: String, context: ModelContext) async {
         do {
             let data = try EnumeratedCSV(string: content, loadColumns: false)
-            
-            self.headers = CSVHeader.createHeaders(data: data.header)
-            self.rows = data.rows.map { CSVRow(cells: $0.map { CSVCell(content: $0) }) }
-            
+            if data.header.isEmpty {
+                print("❌ Error: CSV header is empty or malformed")
+                return
+            }
+
+
+            await MainActor.run {
+                self.headers = CSVHeader.createHeaders(data: data.header)
+                self.rows = data.rows.map { CSVRow(cells: $0.map { CSVCell(content: $0) }) }
+            }
+
             var transactionsToDisplay: [Transaction] = []
             
+            let existingTransactions = fetchAllTransactions(context: context)
+            var transactionSet = Set(existingTransactions.map { "\($0.title)|\($0.amount)|\($0.dateAdded)|\($0.category)" })
+
             for row in self.rows {
+                guard row.cells.count > 6 else {
+                    print("⚠️ Hiba: a sor kevesebb oszlopot tartalmaz, mint a várt 7. Sor tartalma: \(row.cells)")
+                    continue
+                }
+
                 let dateString = row.cells[3].content
-                
                 if let date = convertToDate(dateString: dateString) {
                     let title = row.cells[4].content
-                    var amount = Double(row.cells[5].content)!
+                    var amount = Double(row.cells[5].content) ?? 0.0
                     let category: Category = amount < 0 ? .expense : .income
-                    let fee = Double(row.cells[6].content)!
+                    let fee = Double(row.cells[6].content) ?? 0.0
                     amount = abs(amount) + fee
-                    
+
                     let newTransaction = Transaction(
                         title: title,
                         remarks: "",
@@ -72,41 +103,43 @@ class CSVViewModel: ObservableObject {
                         shopCategory: "",
                         tintColor: tint
                     )
-                    
-                    let existingTransactions = fetchAllTransactions(context: context)
-                    let isDuplicate = existingTransactions.contains { existing in
-                        existing.title == newTransaction.title &&
-                        existing.amount == newTransaction.amount &&
-                        existing.dateAdded == newTransaction.dateAdded &&
-                        existing.category == newTransaction.category
+
+                    let transactionKey = "\(newTransaction.title)|\(newTransaction.amount)|\(newTransaction.dateAdded)|\(newTransaction.category)"
+
+                    if transactionSet.contains(transactionKey) {
+                        continue
                     }
-                    
-                    if !isDuplicate {
-                        transactionsToDisplay.append(newTransaction)
+
+                    if let store = await shopViewModel.fetchStoreByTitle(title: newTransaction.title) {
+                        newTransaction.shopCategory = store.category
+                        context.insert(newTransaction)
                     } else {
-                        print("Duplicate transaction found, skipping: \(newTransaction)")
+                        transactionsToDisplay.append(newTransaction)
                     }
+
+                    transactionSet.insert(transactionKey)
                 } else {
                     print("Invalid date format")
                 }
             }
-            
-            self.transactions = transactionsToDisplay
-            
-            isCategoryPickerPresented = true
-            
+
+            await MainActor.run {
+                self.transactions = transactionsToDisplay
+                self.isCategoryPickerPresented = !transactionsToDisplay.isEmpty
+            }
+
         } catch {
             print("Error parsing CSV: \(error)")
         }
     }
     
     func selectCategoryForTransaction(transaction: Transaction, category: String) {
-        // Here, you would update the transaction's category
         if let index = transactions.firstIndex(where: { $0.title == transaction.title }) {
             transactions[index].shopCategory = category
         }
         print("Category selected: \(category) for transaction \(transaction.title)")
     }
+
     
     func fetchAllTransactions(context: ModelContext) -> [Transaction] {
         let fetchDescriptor = FetchDescriptor<Transaction>()
@@ -138,10 +171,25 @@ class CSVViewModel: ObservableObject {
             }
     }
 
+    @MainActor
     func saveTransactionsToDatabase(context: ModelContext) {
+        var uniqueShops: [String: Shop] = [:]
+        
         for transaction in transactions {
             context.insert(transaction)
             print("✅ Transactions saved to database!")
+            
+            if uniqueShops[transaction.title] == nil {
+                let newShop = Shop(title: transaction.title, category: transaction.shopCategory)
+                uniqueShops[transaction.title] = newShop
+            }
+        }
+
+        let uniqueShopSet = Set(uniqueShops.values)
+        
+        Task {
+            await shopViewModel.saveShopsToDatabase(uniqueShopSet)
         }
     }
+
 }
