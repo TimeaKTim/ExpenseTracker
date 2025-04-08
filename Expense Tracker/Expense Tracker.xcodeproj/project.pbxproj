@@ -70,6 +70,7 @@
 				Model/ShopCategory.swift,
 				Model/TintColor.swift,
 				Model/Transaction.swift,
+				Model/TransactionKey.swift,
 				View/Helpers/CardView.swift,
 				View/Helpers/FilterTransactionsView.swift,
 			);

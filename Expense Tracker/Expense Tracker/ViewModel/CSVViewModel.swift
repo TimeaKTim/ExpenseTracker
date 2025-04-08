@@ -69,16 +69,21 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                 return
             }
 
-
             await MainActor.run {
                 self.headers = CSVHeader.createHeaders(data: data.header)
                 self.rows = data.rows.map { CSVRow(cells: $0.map { CSVCell(content: $0) }) }
             }
 
             var transactionsToDisplay: [Transaction] = []
-            
+
+            // 🔍 Előre lekérjük a meglévő tranzakciókat és Store-okat
             let existingTransactions = fetchAllTransactions(context: context)
-            var transactionSet = Set(existingTransactions.map { "\($0.title)|\($0.amount)|\($0.dateAdded)|\($0.category)" })
+            var transactionSet = Set(existingTransactions.map {
+                TransactionKey(title: $0.title, amount: $0.amount, date: $0.dateAdded, category: $0.category)
+            })
+
+            let allStores = await shopViewModel.fetchAllStores()
+            let storeDict = Dictionary(uniqueKeysWithValues: allStores.map { ($0.title, $0) })
 
             for row in self.rows {
                 guard row.cells.count > 6 else {
@@ -87,40 +92,40 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                 }
 
                 let dateString = row.cells[3].content
-                if let date = convertToDate(dateString: dateString) {
-                    let title = row.cells[4].content
-                    var amount = Double(row.cells[5].content) ?? 0.0
-                    let category: Category = amount < 0 ? .expense : .income
-                    let fee = Double(row.cells[6].content) ?? 0.0
-                    amount = abs(amount) + fee
-
-                    let newTransaction = Transaction(
-                        title: title,
-                        remarks: "",
-                        amount: amount,
-                        dateAdded: date,
-                        category: category,
-                        shopCategory: "",
-                        tintColor: tint
-                    )
-
-                    let transactionKey = "\(newTransaction.title)|\(newTransaction.amount)|\(newTransaction.dateAdded)|\(newTransaction.category)"
-
-                    if transactionSet.contains(transactionKey) {
-                        continue
-                    }
-
-                    if let store = await shopViewModel.fetchStoreByTitle(title: newTransaction.title) {
-                        newTransaction.shopCategory = store.category
-                        context.insert(newTransaction)
-                    } else {
-                        transactionsToDisplay.append(newTransaction)
-                    }
-
-                    transactionSet.insert(transactionKey)
-                } else {
-                    print("Invalid date format")
+                guard let date = convertToDate(dateString: dateString) else {
+                    print("❌ Invalid date: \(dateString)")
+                    continue
                 }
+
+                let title = row.cells[4].content
+                var amount = Double(row.cells[5].content) ?? 0.0
+                let category: Category = amount < 0 ? .expense : .income
+                let fee = Double(row.cells[6].content) ?? 0.0
+                amount = abs(amount) + fee
+
+                let transactionKey = TransactionKey(title: title, amount: amount, date: date, category: category.rawValue)
+                if transactionSet.contains(transactionKey) {
+                    continue
+                }
+
+                let newTransaction = Transaction(
+                    title: title,
+                    remarks: "",
+                    amount: amount,
+                    dateAdded: date,
+                    category: category,
+                    shopCategory: "",
+                    tintColor: tint
+                )
+
+                if let store = storeDict[title] {
+                    newTransaction.shopCategory = store.category
+                    context.insert(newTransaction)
+                } else {
+                    transactionsToDisplay.append(newTransaction)
+                }
+
+                transactionSet.insert(transactionKey)
             }
 
             await MainActor.run {
@@ -154,15 +159,19 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
     }
     
     func convertToDate(dateString: String) -> Date? {
-        let originalFormatter = DateFormatter()
-        originalFormatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        
-        if let date = originalFormatter.date(from: dateString) {
-            return date
-        } else {
-            print("Invalid date string format")
-            return nil
+        let formats = ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "dd/MM/yyyy"]
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+
+        for format in formats {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: dateString) {
+                return date
+            }
         }
+
+        print("❌ Invalid date format for: \(dateString)")
+        return nil
     }
     
     func updateTransactionCategory(transaction: Transaction, category: String) {

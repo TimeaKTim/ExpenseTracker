@@ -53,6 +53,17 @@ class ShopCategoryViewModel: ObservableObject {
             return nil
         }
     }
+    
+    func fetchAllStores() async -> [Shop] {
+        do {
+            let snapshot = try await db.collection("Shops").getDocuments()
+            let shops = try snapshot.documents.map { try $0.data(as: Shop.self) }
+            return shops
+        } catch {
+            print("❌ Error fetching all stores: \(error.localizedDescription)")
+            return []
+        }
+    }
 
     func addCategoryToDatabase(_ category: ShopCategory) {
         do {
