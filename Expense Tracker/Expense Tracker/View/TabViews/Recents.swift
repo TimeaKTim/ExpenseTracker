@@ -64,7 +64,7 @@ struct Recents: View {
 
     private func filteredTransactionsView() -> some View {
         FilterTransactionsView(satrtDate: startDate, endDate: endDate) { transactions in
-            VStack {
+            LazyVStack {
                 CardView(
                     income: total(transactions, category: .income),
                     expense: total(transactions, category: .expense)
@@ -72,9 +72,9 @@ struct Recents: View {
                 
                 CustomSegmentedControl()
                     .padding(.bottom, 10)
-                
-                ForEach(transactions.filter { $0.category == selectedCategory.rawValue }) { transaction in
-                    NavigationLink(value: transaction) {
+                let filtered = transactions.filter { $0.category == selectedCategory.rawValue }
+                ForEach(filtered) { transaction in
+                    NavigationLink(destination: NewExpenseView(editTransaction: transaction, csvViewModel: CSVViewModel())) {
                         TransactionCardView(transaction: transaction)
                     }
                     .buttonStyle(.plain)

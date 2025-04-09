@@ -13,6 +13,7 @@ struct Graphs: View {
     /// View Properties
     @Query(animation: .snappy) private var transactions: [Transaction]
     @State private var chartGroups: [ChartGroup] = []
+    
     var body: some View {
         NavigationStack {
             ScrollView(.vertical){
@@ -49,44 +50,44 @@ struct Graphs: View {
             }
         }
     }
-        @ViewBuilder
-        func ChartView() -> some View {
-            Chart {
-                chartBars
-            }
-            /// Making Chart Scrollable
-            .chartScrollableAxes(.horizontal)
-            .chartXVisibleDomain(length: 4)
-            .chartLegend(position: .bottom, alignment: .trailing)
-            .chartYAxis {
-                AxisMarks(position: .leading) { value in
-                    let doubleValue = value.as(Double.self) ?? 0
-                    
-                    AxisGridLine()
-                    AxisTick()
-                    AxisValueLabel {
-                        Text(axisLabel(doubleValue)) // Wrap string in Text
-                    }
+    @ViewBuilder
+    func ChartView() -> some View {
+        Chart {
+            chartBars
+        }
+        /// Making Chart Scrollable
+        .chartScrollableAxes(.horizontal)
+        .chartXVisibleDomain(length: 4)
+        .chartLegend(position: .bottom, alignment: .trailing)
+        .chartYAxis {
+            AxisMarks(position: .leading) { value in
+                let doubleValue = value.as(Double.self) ?? 0
+                
+                AxisGridLine()
+                AxisTick()
+                AxisValueLabel {
+                    Text(axisLabel(doubleValue)) // Wrap string in Text
                 }
             }
-            /// Foreground Colors
-            .chartForegroundStyleScale(range: [Color.green.gradient, Color.red.gradient])
         }
+        /// Foreground Colors
+        .chartForegroundStyleScale(range: [Color.green.gradient, Color.red.gradient])
+    }
 
-        var chartBars: some ChartContent {
-            ForEach(chartGroups) { group in
-                ForEach(group.categories) { chart in
-                    BarMark(
-                        x: .value("Month", format(date: group.date, format: "MMM yy")),
-                        y: .value(chart.category.rawValue, chart.totalValue),
-                        width: 20
-                    )
-                    .position(by: .value("Category", chart.category.rawValue), axis: .horizontal)
-                    .foregroundStyle(by: .value("Category", chart.category.rawValue))
-                }
+    var chartBars: some ChartContent {
+        ForEach(chartGroups) { group in
+            ForEach(group.categories) { chart in
+                BarMark(
+                    x: .value("Month", format(date: group.date, format: "MMM yy")),
+                    y: .value(chart.category.rawValue, chart.totalValue),
+                    width: 20
+                )
+                .position(by: .value("Category", chart.category.rawValue), axis: .horizontal)
+                .foregroundStyle(by: .value("Category", chart.category.rawValue))
             }
         }
-        
+    }
+    
     func createChartGroup() {
         Task.detached(priority: .high) {
             let calendar = Calendar.current
@@ -128,6 +129,7 @@ struct Graphs: View {
                         )
                     }
                 }
+                
                 // Collecting results and returning them as an array
                 var results: [ChartGroup] = []
                 for await result in group {
@@ -140,18 +142,21 @@ struct Graphs: View {
             
             // UI update must be done on the main thread
             await MainActor.run {
-                self.chartGroups = chartGroups
+                let sortedChartGroups = chartGroups.sorted {
+                    $0.date > $1.date
+                }
+                self.chartGroups = sortedChartGroups
             }
         }
     }
         
-        func axisLabel(_ value: Double) -> String {
-            let intValue = Int(value)
-            let kValue = intValue / 1000
-            
-            return intValue < 1000 ? "\(intValue)" :"\(kValue)K"
-        }
+    func axisLabel(_ value: Double) -> String {
+        let intValue = Int(value)
+        let kValue = intValue / 1000
+        
+        return intValue < 1000 ? "\(intValue)" :"\(kValue)K"
     }
+}
     
 /// List of Transactions for the Selected Month
 struct ListOfExpenses: View {

@@ -59,14 +59,12 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
 
             // Skip the first line (header)
             let dataLines = lines.dropFirst()
-            print(lines)
 
             // Check if any line contains a different currency
             for line in dataLines {
                 let columns = line.components(separatedBy: ",")
                 if columns.count > 7 {
                     let currency = columns[7].trimmingCharacters(in: .whitespacesAndNewlines)
-                    print(currency)
                     if currency != currentCurrency {
                         needsExchangeRates = true
                         break
@@ -138,7 +136,6 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                 let category: Category = amount < 0 ? .expense : .income
                 let fee = Double(row.cells[6].content) ?? 0.0
                 let currency = row.cells[7].content
-                print(currency)
                 
                 amount = abs(amount) + fee
                 
