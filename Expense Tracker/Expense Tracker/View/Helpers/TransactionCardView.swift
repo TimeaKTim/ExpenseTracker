@@ -49,8 +49,17 @@ struct TransactionCardView: View {
                 .lineLimit(1)
                 .hSpacing(.leading)
                 
-                Text(currencyString(transaction.amount, allowedDigits: 1))
-                    .fontWeight(.semibold)
+                VStack(spacing: 10){
+                    Text(currencyString(transaction.amount, allowedDigits: 1, currencyCode: Locale.current.currencySymbol ?? "RON"))
+                        .fontWeight(.semibold)
+                    if let original = transaction.originalAmount,
+                       let currency = transaction.originalCurrency,
+                       currency != Locale.current.currency?.identifier {
+                        Text("\(currencyString(original, allowedDigits: 1, currencyCode: currency))")
+                            .font(.caption2)
+                            .foregroundStyle(.gray)
+                    }
+                }
             }
             .padding(.horizontal, 15)
             .padding(.vertical, 10)

@@ -36,18 +36,17 @@ extension View {
         return formatter.string(from: date)
     }
     
-    func currencyString(_ value: Double, allowedDigits: Int = 2) -> String {
+    func currencyString(_ value: Double, allowedDigits: Int = 2, currencyCode: String) -> String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
         formatter.maximumFractionDigits = allowedDigits
+        formatter.currencyCode = currencyCode 
 
-        return formatter.string(from: .init(value: value)) ?? ""
+        return formatter.string(from: NSNumber(value: value)) ?? ""
     }
     
     var currencySymbol: String {
         let locale = Locale.current
-        
-        print(locale)
         
         return locale.currencySymbol ?? ""
     }

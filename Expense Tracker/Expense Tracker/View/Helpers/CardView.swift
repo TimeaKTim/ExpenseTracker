@@ -17,7 +17,7 @@ struct CardView: View {
             
             VStack(spacing: 0) {
                 HStack(spacing: 12) {
-                    Text("\(currencyString(income - expense))")
+                    Text("\(currencyString(income - expense, currencyCode: Locale.current.currencySymbol ?? "RON"))")
                         .font(.title.bold())
                         .foregroundStyle(Color.primary)
                     
@@ -47,7 +47,7 @@ struct CardView: View {
                                     .font(.caption2)
                                     .foregroundStyle(.gray)
                                 
-                                Text(currencyString(category == .income ? income : expense, allowedDigits: 0))
+                                Text(currencyString(category == .income ? income : expense, allowedDigits: 0, currencyCode: Locale.current.currencySymbol ?? "RON"))
                                     .font(.callout)
                                     .fontWeight(.semibold)
                                     .foregroundStyle(Color.primary)

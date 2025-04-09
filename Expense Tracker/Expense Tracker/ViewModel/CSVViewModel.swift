@@ -57,10 +57,16 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
             let currentCurrency = Locale.current.currency?.identifier ?? "RON"
             var needsExchangeRates = false
 
-            for line in lines {
+            // Skip the first line (header)
+            let dataLines = lines.dropFirst()
+            print(lines)
+
+            // Check if any line contains a different currency
+            for line in dataLines {
                 let columns = line.components(separatedBy: ",")
                 if columns.count > 7 {
                     let currency = columns[7].trimmingCharacters(in: .whitespacesAndNewlines)
+                    print(currency)
                     if currency != currentCurrency {
                         needsExchangeRates = true
                         break
@@ -68,22 +74,20 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                 }
             }
 
+            // Only fetch exchange rates if needed
             if needsExchangeRates {
-                fetchAllExchangeRatesForLocalCurrency { [weak self] rates in
-                    guard let self = self else { return }
-                    guard let rates = rates else {
+                // Wait for the exchange rates to be fetched before continuing
+                Task { @MainActor in
+                    if let rates = await fetchAllExchangeRatesForLocalCurrency() {
+                        // Parse the CSV with the fetched exchange rates
+                        await self.parseCSV(content: validContent, context: context, exchangeRates: rates)
+                    } else {
                         print("❌ Could not fetch exchange rates.")
-                        return
-                    }
-
-                    DispatchQueue.main.async {
-                        Task {
-                            await self.parseCSV(content: validContent, context: context, exchangeRates: rates)
-                        }
                     }
                 }
             } else {
-                print("❌ No nees to fetch exchange rates.")
+                // No need to fetch exchange rates, proceed with empty rates
+                print("❌ No need to fetch exchange rates.")
                 Task {
                     await self.parseCSV(content: validContent, context: context, exchangeRates: [:])
                 }
@@ -160,7 +164,9 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                     dateAdded: date,
                     category: category,
                     shopCategory: "",
-                    tintColor: tint
+                    tintColor: tint,
+                    originalAmount: abs(Double(row.cells[5].content) ?? 0.0 ) + (Double(row.cells[6].content) ?? 0.0),
+                    originalCurrency: currency
                 )
 
                 if let store = storeDict[title] {

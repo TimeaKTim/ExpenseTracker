@@ -18,8 +18,10 @@ class Transaction: @unchecked Sendable, Identifiable {
     var category: String
     var shopCategory: String
     var tintColor: String
+    var originalAmount: Double?
+    var originalCurrency: String?
     
-    init(title: String, remarks: String, amount: Double, dateAdded: Date, category: Category, shopCategory: String, tintColor: TintColor){
+    init(title: String, remarks: String, amount: Double, dateAdded: Date, category: Category, shopCategory: String, tintColor: TintColor, originalAmount: Double? = nil, originalCurrency: String? = nil) {
         self.title = title
         self.remarks = remarks
         self.amount = amount
@@ -27,6 +29,8 @@ class Transaction: @unchecked Sendable, Identifiable {
         self.category = category.rawValue
         self.shopCategory = shopCategory
         self.tintColor = tintColor.color
+        self.originalAmount = originalAmount
+        self.originalCurrency = originalCurrency
     }
     
     /// Extracting Color Value from tintColor String
