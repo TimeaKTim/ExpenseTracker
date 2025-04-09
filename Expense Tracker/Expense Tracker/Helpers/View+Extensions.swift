@@ -8,6 +8,7 @@
 import SwiftUI
 
 extension View {
+    
     @ViewBuilder
     func hSpacing(_ alignment: Alignment = .center) -> some View {
         self
@@ -45,6 +46,8 @@ extension View {
     
     var currencySymbol: String {
         let locale = Locale.current
+        
+        print(locale)
         
         return locale.currencySymbol ?? ""
     }

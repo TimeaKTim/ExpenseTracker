@@ -16,3 +16,4 @@ struct ShopCategory: Identifiable, Encodable, Decodable, Hashable {
         case name = "Name"
     }
 }
+

@@ -19,7 +19,8 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
     @Published var isCategoryPickerPresented: Bool = false
     @Published var categoryToAssign: Category? = nil
     @Published var shopViewModel = ShopCategoryViewModel()
-    
+    @Published var exchangeRates: [String: Double] = [:]
+
     @State var tint: TintColor = tints.randomElement()!
     
     func handleFileImport(for result: Result<URL, Error>, context: ModelContext) {
@@ -33,7 +34,7 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
     
     func readFile(_ url: URL, context: ModelContext) {
         guard url.startAccessingSecurityScopedResource() else { return }
-        
+
         do {
             let possibleEncodings: [String.Encoding] = [.utf8, .isoLatin1, .windowsCP1252]
             var content: String? = nil
@@ -44,24 +45,56 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                     break
                 }
             }
-            
+
             guard let validContent = content else {
                 print("❌ Error: Could not decode file with supported encodings.")
                 return
             }
-            
+
             self.content = validContent
-            Task {
-                await parseCSV(content: validContent, context: context)
+
+            let lines = validContent.components(separatedBy: .newlines)
+            let currentCurrency = Locale.current.currency?.identifier ?? "RON"
+            var needsExchangeRates = false
+
+            for line in lines {
+                let columns = line.components(separatedBy: ",")
+                if columns.count > 7 {
+                    let currency = columns[7].trimmingCharacters(in: .whitespacesAndNewlines)
+                    if currency != currentCurrency {
+                        needsExchangeRates = true
+                        break
+                    }
+                }
+            }
+
+            if needsExchangeRates {
+                fetchAllExchangeRatesForLocalCurrency { [weak self] rates in
+                    guard let self = self else { return }
+                    guard let rates = rates else {
+                        print("❌ Could not fetch exchange rates.")
+                        return
+                    }
+
+                    DispatchQueue.main.async {
+                        Task {
+                            await self.parseCSV(content: validContent, context: context, exchangeRates: rates)
+                        }
+                    }
+                }
+            } else {
+                print("❌ No nees to fetch exchange rates.")
+                Task {
+                    await self.parseCSV(content: validContent, context: context, exchangeRates: [:])
+                }
             }
         }
-        
+
         url.stopAccessingSecurityScopedResource()
     }
-
     
     @MainActor
-    func parseCSV(content: String, context: ModelContext) async {
+    func parseCSV(content: String, context: ModelContext, exchangeRates: [String: Double]) async {
         do {
             let data = try EnumeratedCSV(string: content, loadColumns: false)
             if data.header.isEmpty {
@@ -76,7 +109,6 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
 
             var transactionsToDisplay: [Transaction] = []
 
-            // 🔍 Előre lekérjük a meglévő tranzakciókat és Store-okat
             let existingTransactions = fetchAllTransactions(context: context)
             var transactionSet = Set(existingTransactions.map {
                 TransactionKey(title: $0.title, amount: $0.amount, date: $0.dateAdded, category: $0.category)
@@ -101,10 +133,23 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                 var amount = Double(row.cells[5].content) ?? 0.0
                 let category: Category = amount < 0 ? .expense : .income
                 let fee = Double(row.cells[6].content) ?? 0.0
+                let currency = row.cells[7].content
+                print(currency)
+                
                 amount = abs(amount) + fee
+                
+                if currency != Locale.current.currency?.identifier {
+                    if let rate = exchangeRates[currency] {
+                        amount /= rate
+                    } else {
+                        print("⚠️ Missing exchange rate for currency: \(currency)")
+                    }
+                }
+
 
                 let transactionKey = TransactionKey(title: title, amount: amount, date: date, category: category.rawValue)
                 if transactionSet.contains(transactionKey) {
+                    print("Duplicate found")
                     continue
                 }
 
