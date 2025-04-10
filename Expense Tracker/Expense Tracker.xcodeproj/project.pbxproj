@@ -66,6 +66,7 @@
 				"Helpers/View+Extensions.swift",
 				Model/Category.swift,
 				Model/CSVHeader.swift,
+				Model/GraphType.swift,
 				Model/Shop.swift,
 				Model/ShopCategory.swift,
 				Model/TintColor.swift,

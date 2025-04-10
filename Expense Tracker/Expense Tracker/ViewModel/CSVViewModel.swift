@@ -124,6 +124,13 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                     print("⚠️ Hiba: a sor kevesebb oszlopot tartalmaz, mint a várt 7. Sor tartalma: \(row.cells)")
                     continue
                 }
+                
+                let status = row.cells[8].content
+                
+                if(status != "COMPLETED") {
+                    print("Not Complete Payment Found")
+                    continue
+                }
 
                 let dateString = row.cells[3].content
                 guard let date = convertToDate(dateString: dateString) else {
