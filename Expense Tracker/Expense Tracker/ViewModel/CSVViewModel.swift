@@ -36,7 +36,7 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
         guard url.startAccessingSecurityScopedResource() else { return }
 
         do {
-            let possibleEncodings: [String.Encoding] = [.utf8, .isoLatin1, .windowsCP1252]
+            let possibleEncodings: [String.Encoding] = [.utf8]
             var content: String? = nil
 
             for encoding in possibleEncodings {
@@ -240,6 +240,11 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
         var uniqueShops: [String: Shop] = [:]
         
         for transaction in transactions {
+            guard !transaction.shopCategory.isEmpty else {
+                print("⚠️ Skipping transaction \(transaction.title) - no shop category assigned.")
+                continue
+            }
+            
             context.insert(transaction)
             print("✅ Transactions saved to database!")
             

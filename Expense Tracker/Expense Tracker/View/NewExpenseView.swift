@@ -215,6 +215,7 @@ struct NewExpenseView: View {
                 if let category = editTransaction.rawCategory {
                     self.category = category
                 }
+                shopCategory = editTransaction.shopCategory
                 amount = editTransaction.amount
                 if let tint = editTransaction.tint {
                     self.tint = tint
