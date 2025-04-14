@@ -13,43 +13,130 @@ struct Graphs: View {
     /// View Properties
     @Query(animation: .snappy) private var transactions: [Transaction]
     @State private var chartGroups: [ChartGroup] = []
+    @State private var categoryTotals: [CategoryTotal] = []
+    @State private var graphType: GraphType = .month
+    @State private var selectedCategories: Set<String> = []
+    @State private var showCategorySheet = false
+
+    @Namespace private var animation
     
     var body: some View {
         NavigationStack {
-            ScrollView(.vertical){
-                LazyVStack(spacing: 10) {
-                    ChartView()
-                        .frame(height: 200)
-                        .padding(10)
-                        .padding(.top, 10)
-                        .background(.background, in: .rect(cornerRadius: 10))
-                    
-                    ForEach(chartGroups) { group in
-                        VStack(alignment: .leading, spacing: 10) {
-                            Text(format(date: group.date, format: "MMM yy"))
-                                .font(.caption2)
-                                .foregroundStyle(.gray)
-                                .hSpacing(.leading)
-                            
-                            NavigationLink {
-                                ListOfExpenses(month: group.date)
-                            } label: {
-                                CardView(income: group.totalIncome, expense: group.totalExpense)
+            ScrollView(.vertical) {
+                HStack(spacing: 0) {
+                    ForEach(GraphType.allCases, id: \.rawValue) { type in
+                        Text(type.rawValue)
+                            .hSpacing()
+                            .padding(.vertical, 10)
+                            .background {
+                                if type == graphType {
+                                    Capsule()
+                                        .fill(.background)
+                                        .matchedGeometryEffect(id: "ACTIVETAB", in: animation)
+                                }
                             }
-                            .buttonStyle(.plain)
-                        }
+                            .contentShape(.capsule)
+                            .onTapGesture {
+                                withAnimation(.snappy) {
+                                    graphType = type
+                                }
+                            }
                     }
-                    .padding(15)
                 }
-                .navigationTitle("Graphs")
-                .background(.gray.opacity(0.15))
-                .onAppear {
-                    /// Creating Chart Groups
-                    createChartGroup()
+                .background(.gray.opacity(0.15), in: .capsule)
+                .padding(.top, 5)
+                
+                switch graphType {
+                    case .month:
+                        MonthlyChart()
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    case .category:
+                        CategoryChart()
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
+                    default:
+                        EmptyView()
+                }
+            }
+            .navigationTitle("Graphs")
+            .background(.gray.opacity(0.15))
+        }
+    }
+    
+    @ViewBuilder
+    func CategoryChart() -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Spacer(minLength: 0)
+                Chart {
+                    ForEach(categoryTotals.filter { selectedCategories.isEmpty || selectedCategories.contains($0.shopCategory) }) { data in
+                        SectorMark(
+                            angle: .value("Amount", data.total),
+                            innerRadius: .ratio(0.61),
+                            angularInset: 4
+                        )
+                        .cornerRadius(8)
+                        .foregroundStyle(by: .value("Category", data.shopCategory))
+                    }
+                }
+                .frame(height: 300)
+                .chartLegend(position: .bottom, alignment: .center)
+                .frame(maxWidth: 300)
+                Spacer(minLength: 0)
+            }
+            .padding(.top, 15)
+        }
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Kategóriák kiválasztása") {
+                    showCategorySheet = true
+                }
+                .sheet(isPresented: $showCategorySheet) {
+                    CategorySelectionSheet(
+                        allCategories: Array(Set(categoryTotals.map { $0.shopCategory })),
+                        selectedCategories: $selectedCategories
+                    )
                 }
             }
         }
+        .padding(.horizontal, 10)
+        .onAppear {
+            calculateCategoryTotals()
+        }
     }
+    
+    @ViewBuilder
+    func MonthlyChart() -> some View {
+        LazyVStack(spacing: 10) {
+            ChartView()
+                .frame(height: 200)
+                .padding(10)
+                .padding(.top, 10)
+                .background(.background, in: .rect(cornerRadius: 10))
+            
+            ForEach(chartGroups) { group in
+                VStack(alignment: .leading, spacing: 10) {
+                    Text(format(date: group.date, format: "MMM yy"))
+                        .font(.caption2)
+                        .foregroundStyle(.gray)
+                        .hSpacing(.leading)
+                    
+                    NavigationLink {
+                        ListOfExpenses(month: group.date)
+                    } label: {
+                        CardView(income: group.totalIncome, expense: group.totalExpense)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(15)
+        }
+        .background(.gray.opacity(0.15))
+        .onAppear {
+            /// Creating Chart Groups
+            createChartGroup()
+        }
+    }
+    
     @ViewBuilder
     func ChartView() -> some View {
         Chart {
@@ -86,6 +173,27 @@ struct Graphs: View {
                 .foregroundStyle(by: .value("Category", chart.category.rawValue))
             }
         }
+    }
+    
+    func calculateCategoryTotals() {
+        let grouped = Dictionary(
+            grouping: transactions.filter {
+                $0.category == Category.expense.rawValue &&
+                !$0.shopCategory.isEmpty &&
+                $0.shopCategory != "Transactions to Others"
+            }
+        ) {
+            $0.shopCategory
+        }
+        
+        let totals = grouped.map { (category, items) in
+            let totalAmount = items.reduce(0) { $0 + $1.amount }
+            print(category)
+            print(totalAmount)
+            return CategoryTotal(shopCategory: category, total: totalAmount)
+        }
+        
+        self.categoryTotals = totals.sorted { $0.total > $1.total }
     }
     
     func createChartGroup() {
@@ -157,7 +265,7 @@ struct Graphs: View {
         return intValue < 1000 ? "\(intValue)" :"\(kValue)K"
     }
 }
-    
+
 /// List of Transactions for the Selected Month
 struct ListOfExpenses: View {
     let month: Date
@@ -213,6 +321,58 @@ struct ListOfExpenses: View {
             TransactionCardView(transaction: transaction)
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct CategorySelectionSheet: View {
+    let allCategories: [String]
+    @Binding var selectedCategories: Set<String>
+    
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(allCategories.sorted(), id: \.self) { category in
+                    MultipleSelectionRow(
+                        title: category,
+                        isSelected: selectedCategories.contains(category)
+                    ) {
+                        if selectedCategories.contains(category) {
+                            selectedCategories.remove(category)
+                        } else {
+                            selectedCategories.insert(category)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Kategóriák")
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Kész") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
+            }
+        }
+    }
+}
+
+struct MultipleSelectionRow: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            HStack {
+                Text(title)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .foregroundColor(.blue)
+                }
+            }
+        }
+        .foregroundColor(.primary)
     }
 }
 

@@ -15,6 +15,12 @@ struct ChartGroup: Identifiable {
     var totalExpense: Double
 }
 
+struct CategoryTotal: Identifiable {
+    var id: String { shopCategory }
+    let shopCategory: String
+    let total: Double
+}
+
 struct ChartCategory: Identifiable {
     let id: UUID = .init()
     var totalValue: Double
