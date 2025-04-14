@@ -17,6 +17,8 @@ struct Graphs: View {
     @State private var graphType: GraphType = .month
     @State private var selectedCategories: Set<String> = []
     @State private var showCategorySheet = false
+    @State private var selectedMonth: Date = Date()
+    @State private var totalExpenseForMonth: Double = 0
 
     @Namespace private var animation
     
@@ -66,22 +68,29 @@ struct Graphs: View {
     func CategoryChart() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                Spacer(minLength: 0)
-                Chart {
-                    ForEach(categoryTotals.filter { selectedCategories.isEmpty || selectedCategories.contains($0.shopCategory) }) { data in
-                        SectorMark(
-                            angle: .value("Amount", data.total),
-                            innerRadius: .ratio(0.61),
-                            angularInset: 4
-                        )
-                        .cornerRadius(8)
-                        .foregroundStyle(by: .value("Category", data.shopCategory))
+                VStack(spacing: 10){
+                    Text(currencyString(totalExpenseForMonth, allowedDigits: 1, currencyCode: Locale.current.currencySymbol ?? "RON"))
+                        .font(.title3.bold())
+                        .multilineTextAlignment(.center)
+                    
+                    Spacer(minLength: 0)
+                    
+                    Chart {
+                        ForEach(categoryTotals.filter { selectedCategories.isEmpty || selectedCategories.contains($0.shopCategory) }) { data in
+                            SectorMark(
+                                angle: .value("Amount", data.total),
+                                innerRadius: .ratio(0.61),
+                                angularInset: 2
+                            )
+                            .cornerRadius(8)
+                            .foregroundStyle(by: .value("Category", data.shopCategory))
+                        }
                     }
+                    .frame(height: 300)
+                    .frame(maxWidth: 300)
+                    
+                    Spacer(minLength: 0)
                 }
-                .frame(height: 300)
-                .chartLegend(position: .bottom, alignment: .center)
-                .frame(maxWidth: 300)
-                Spacer(minLength: 0)
             }
             .padding(.top, 15)
         }
@@ -97,9 +106,24 @@ struct Graphs: View {
                     )
                 }
             }
+            
+            ToolbarItem(placement: .navigationBarLeading) {
+                Menu {
+                    ForEach(uniqueMonths(), id: \.self) { month in
+                        Button(format(date: month, format: "MMM yyyy")) {
+                            selectedMonth = month
+                        }
+                    }
+                } label: {
+                    Label(format(date: selectedMonth, format: "MMM yyyy"), systemImage: "calendar")
+                }
+            }
         }
         .padding(.horizontal, 10)
         .onAppear {
+            calculateCategoryTotals()
+        }
+        .onChange(of: selectedMonth) {
             calculateCategoryTotals()
         }
     }
@@ -160,6 +184,14 @@ struct Graphs: View {
         /// Foreground Colors
         .chartForegroundStyleScale(range: [Color.green.gradient, Color.red.gradient])
     }
+    
+    func uniqueMonths() -> [Date] {
+        let calendar = Calendar.current
+        let months = transactions.map {
+            calendar.date(from: calendar.dateComponents([.year, .month], from: $0.dateAdded)) ?? Date()
+        }
+        return Array(Set(months)).sorted(by: >)
+    }
 
     var chartBars: some ChartContent {
         ForEach(chartGroups) { group in
@@ -176,24 +208,25 @@ struct Graphs: View {
     }
     
     func calculateCategoryTotals() {
-        let grouped = Dictionary(
-            grouping: transactions.filter {
+        let calendar = Calendar.current
+
+            let filtered = transactions.filter {
                 $0.category == Category.expense.rawValue &&
                 !$0.shopCategory.isEmpty &&
-                $0.shopCategory != "Transactions to Others"
+                $0.shopCategory != "Transactions to Others" &&
+                calendar.isDate($0.dateAdded, equalTo: selectedMonth, toGranularity: .month)
             }
-        ) {
-            $0.shopCategory
-        }
-        
-        let totals = grouped.map { (category, items) in
-            let totalAmount = items.reduce(0) { $0 + $1.amount }
-            print(category)
-            print(totalAmount)
-            return CategoryTotal(shopCategory: category, total: totalAmount)
-        }
-        
-        self.categoryTotals = totals.sorted { $0.total > $1.total }
+
+            let groupedByCategory = Dictionary(grouping: filtered, by: { $0.shopCategory })
+
+            let categoryTotals = groupedByCategory.map { (category, items) in
+                let total = items.reduce(0) { $0 + $1.amount }
+                return CategoryTotal(shopCategory: category, total: total)
+            }
+
+            self.categoryTotals = categoryTotals.sorted { $0.total > $1.total }
+
+            self.totalExpenseForMonth = filtered.reduce(0) { $0 + $1.amount }
     }
     
     func createChartGroup() {
