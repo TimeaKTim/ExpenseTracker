@@ -15,8 +15,6 @@ struct Graphs: View {
     @State private var chartGroups: [ChartGroup] = []
     @State private var categoryTotals: [CategoryTotal] = []
     @State private var graphType: GraphType = .month
-    @State private var selectedCategories: Set<String> = []
-    @State private var showCategorySheet = false
     @State private var selectedMonth: Date = Date()
     @State private var totalExpenseForMonth: Double = 0
 
@@ -55,8 +53,9 @@ struct Graphs: View {
                     case .category:
                         CategoryChart()
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
-                    default:
-                        EmptyView()
+                    case .yearly:
+                        YearlyCategoryTrendChart()
+                        .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
             }
             .navigationTitle("Graphs")
@@ -65,18 +64,21 @@ struct Graphs: View {
     }
     
     @ViewBuilder
+    func YearlyCategoryTrendChart() -> some View {
+        
+    }
+    
+    @ViewBuilder
     func CategoryChart() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
-                VStack(spacing: 10){
+                VStack(spacing: 10) {
                     Text(currencyString(totalExpenseForMonth, allowedDigits: 1, currencyCode: Locale.current.currencySymbol ?? "RON"))
                         .font(.title3.bold())
                         .multilineTextAlignment(.center)
                     
-                    Spacer(minLength: 0)
-                    
                     Chart {
-                        ForEach(categoryTotals.filter { selectedCategories.isEmpty || selectedCategories.contains($0.shopCategory) }) { data in
+                        ForEach(categoryTotals) { data in
                             SectorMark(
                                 angle: .value("Amount", data.total),
                                 innerRadius: .ratio(0.61),
@@ -87,26 +89,14 @@ struct Graphs: View {
                         }
                     }
                     .frame(height: 300)
-                    .frame(maxWidth: 300)
+                    .frame(minWidth: 300, maxWidth: 300)
                     
-                    Spacer(minLength: 0)
+                    CategoryCard()
                 }
             }
             .padding(.top, 15)
         }
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button("Kategóriák kiválasztása") {
-                    showCategorySheet = true
-                }
-                .sheet(isPresented: $showCategorySheet) {
-                    CategorySelectionSheet(
-                        allCategories: Array(Set(categoryTotals.map { $0.shopCategory })),
-                        selectedCategories: $selectedCategories
-                    )
-                }
-            }
-            
             ToolbarItem(placement: .navigationBarLeading) {
                 Menu {
                     ForEach(uniqueMonths(), id: \.self) { month in
@@ -127,7 +117,33 @@ struct Graphs: View {
             calculateCategoryTotals()
         }
     }
-    
+
+    @ViewBuilder
+    func CategoryCard() -> some View {
+        LazyVStack(spacing: 12) {
+            ForEach(categoryTotals) { data in
+                let percentage = totalExpenseForMonth == 0 ? 0 : data.total / totalExpenseForMonth
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(data.shopCategory)
+                            .font(.headline)
+                        Text(currencyString(data.total, currencyCode: Locale.current.currencySymbol ?? "RON"))
+                            .font(.subheadline)
+                            .foregroundStyle(.gray)
+                    }
+                    Spacer()
+                    Text(String(format: "%.1f%%", percentage * 100))
+                        .font(.subheadline.bold())
+                        .foregroundColor(.blue)
+                }
+                .padding()
+                .background(.background)
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .shadow(color: .black.opacity(0.05), radius: 4, x: 0, y: 2)
+            }
+        }
+    }
+
     @ViewBuilder
     func MonthlyChart() -> some View {
         LazyVStack(spacing: 10) {
@@ -412,3 +428,4 @@ struct MultipleSelectionRow: View {
 #Preview {
     Graphs()
 }
+

@@ -10,5 +10,5 @@ import SwiftUI
 enum GraphType: String, CaseIterable {
     case month = "Monthly"
     case category = "Category"
-    case donut = "Donut Chart"
+    case yearly = "Yearly"
 }
