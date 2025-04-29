@@ -194,7 +194,7 @@ struct NewExpenseView: View {
                 } label: {
                     Label("Import", systemImage: "square.and.arrow.down")
                 }
-                .fileImporter(isPresented: $isPresented, allowedContentTypes: [UTType.commaSeparatedText]) { result in
+                .fileImporter(isPresented: $isPresented, allowedContentTypes: [UTType.commaSeparatedText, UTType.pdf]) { result in
                     csvViewModel.handleFileImport(for: result, context: context)
                 }
                 .popover(isPresented: $csvViewModel.isCategoryPickerPresented) {

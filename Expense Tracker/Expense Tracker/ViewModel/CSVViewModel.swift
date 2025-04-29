@@ -9,6 +9,7 @@ import SwiftUI
 import SwiftCSV
 import SwiftData
 import Foundation
+import PDFKit
 
 class CSVViewModel: ObservableObject, @unchecked Sendable {
     @Published var content: String = ""
@@ -26,10 +27,160 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
     func handleFileImport(for result: Result<URL, Error>, context: ModelContext) {
         switch result {
         case .success(let url):
-            readFile(url, context: context)
+            let fileExtension = url.pathExtension.lowercased()
+            if fileExtension == "csv" {
+                readFile(url, context: context)
+            } else if fileExtension == "pdf" {
+                Task {
+                        await self.extractPDFText(from: url, context: context)
+                    }
+            } else {
+                print("Unsupported file type: \(fileExtension)")
+            }
         case .failure(let error):
             print("Error loading file: \(error)")
         }
+    }
+    
+    func extractFirstNumber(from text: String) -> String? {
+            let pattern = #"\d+(\.\d+)?"#
+            if let regex = try? NSRegularExpression(pattern: pattern),
+               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
+                let range = Range(match.range, in: text)
+                return range.map { String(text[$0]) }
+            }
+            return nil
+        }
+    
+    func extractPDFText(from url: URL, context: ModelContext) async{
+        guard let document = PDFDocument(url: url) else { return }
+
+        let dateRegex = try! NSRegularExpression(pattern: #"^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}"#)
+        let fromToRegex = try! NSRegularExpression(pattern: #"^(To|From):"#)
+        let amountLineRegex = try! NSRegularExpression(pattern: #"(\d{1,3}(,\d{3})*(\.\d+)?\s*\w{3})\s+(\d{1,3}(,\d{3})*(\.\d+)?\s*\w{3})"#)
+
+        var currentDate: Date?
+        var currentTitle: String = ""
+        var currentAmount: Double = 0.0
+        var currentRemarks: String = ""
+        var currentCategory: Category = .expense
+
+        var extractedTransactions: [Transaction] = []
+
+        for i in 0..<document.pageCount {
+            guard let page = document.page(at: i),
+                  let text = page.string else { continue }
+
+            let lines = text.components(separatedBy: .newlines)
+
+            for line in lines {
+//                print(line)
+                let lineRange = NSRange(location: 0, length: line.utf16.count)
+
+                if dateRegex.firstMatch(in: line, range: lineRange) != nil {
+                    let parts = line.components(separatedBy: " ")
+                    let cleanedParts = parts.prefix(3).map { $0.replacingOccurrences(of: ",", with: "") }
+                    let dateString = cleanedParts.joined(separator: " ")
+                    currentDate = convertToDate(dateString: dateString)
+
+                    let remaining = parts.dropFirst(3).joined(separator: " ")
+                    if let number = extractFirstNumber(from: remaining),
+                       let amount = Double(number) {
+                        currentAmount = amount
+                        if let range = remaining.range(of: number) {
+                            currentTitle = String(remaining[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        } else {
+                            currentTitle = remaining
+                        }
+                    }
+                    if currentTitle == "" {
+                        if let referenceRange = remaining.range(of: "Reference:") {
+                            let firstPart = remaining[..<referenceRange.lowerBound].trimmingCharacters(in: .whitespaces)
+                            
+                            currentTitle = firstPart
+                        }
+                    }
+                } else if fromToRegex.firstMatch(in: line, range: lineRange) != nil{
+                    currentRemarks = line
+                        .replacingOccurrences(of: "To:", with: "")
+                        .replacingOccurrences(of: "From:", with: "")
+                        .trimmingCharacters(in: .whitespaces)
+
+                    currentCategory = line.hasPrefix("To:") ? .expense : .income
+                } else if amountLineRegex.firstMatch(in: line, range: lineRange) != nil && currentAmount == 0.0 && currentTitle != ""{
+                    if let amountMatch = amountLineRegex.firstMatch(in: line, range: lineRange) {
+                        let amountString = (line as NSString).substring(with: amountMatch.range(at: 1))
+                        
+                        let amountWithoutCurrency = amountString.components(separatedBy: " ").first ?? ""
+                        let cleanedAmount = amountWithoutCurrency.replacingOccurrences(of: ",", with: "")
+                        
+                        if let amount = Double(cleanedAmount) {
+                            currentAmount = amount
+                        }
+                    }
+                }
+                if currentTitle.hasPrefix("Exchanged") {
+                    currentRemarks = "-"
+                }
+                
+//                print(currentTitle, currentAmount, currentRemarks)
+                if currentAmount != 0.0 && currentTitle != "" && currentRemarks != ""{
+                    let newTransaction = Transaction(
+                        title: currentTitle,
+                        remarks: currentRemarks,
+                        amount: currentAmount,
+                        dateAdded: currentDate!,
+                        category: currentCategory,
+                        shopCategory: "",
+                        tintColor: tint,
+                        originalAmount: currentAmount,
+                        originalCurrency: "RON"
+                    )
+                    
+//                    print(newTransaction.title, newTransaction.amount, newTransaction.remarks, newTransaction.category, newTransaction.dateAdded)
+                    
+                    extractedTransactions.append(newTransaction)
+                    
+                    currentDate = nil
+                    currentTitle = ""
+                    currentAmount = 0.0
+                    currentRemarks = ""
+                }
+            }
+        }
+        
+        let existingTransactions = fetchAllTransactions(context: context)
+            var transactionSet = Set(existingTransactions.map {
+                TransactionKey(title: $0.title, amount: $0.amount, date: $0.dateAdded, category: $0.category)
+            })
+        
+        let allStores = await shopViewModel.fetchAllStores()
+        let storeDict = Dictionary(uniqueKeysWithValues: allStores.map { ($0.title, $0) })
+
+        for transaction in extractedTransactions {
+            let key = TransactionKey(title: transaction.title, amount: transaction.amount, date: transaction.dateAdded, category: transaction.category)
+            if transactionSet.contains(key) && !key.title.hasPrefix("Exchanged") && !key.title.hasPrefix("Transfer") && !key.title.hasPrefix("BudapestGO"){
+//                print(key.title, key.amount, key.date, key.category)
+                print("🟡 Duplikált tranzakció kihagyva: \(transaction.title)")
+                continue
+            }
+
+            if let store = storeDict[transaction.title] {
+                transaction.shopCategory = store.category
+                context.insert(transaction)
+            } else {
+                await MainActor.run {
+                    self.transactions.append(transaction)
+                }
+            }
+
+            transactionSet.insert(key)
+        }
+
+        await MainActor.run {
+            self.isCategoryPickerPresented = !self.transactions.isEmpty
+        }
+
     }
     
     func readFile(_ url: URL, context: ModelContext) {
@@ -214,9 +365,17 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
     }
     
     func convertToDate(dateString: String) -> Date? {
-        let formats = ["yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "dd/MM/yyyy"]
+        let formats = [
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd",
+            "dd/MM/yyyy",
+            "MMM d yyyy",
+            "MMM d, yyyy"
+        ]
+
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Europe/Bucharest")
 
         for format in formats {
             formatter.dateFormat = format
