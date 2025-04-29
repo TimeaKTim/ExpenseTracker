@@ -26,6 +26,10 @@ struct ContentView: View {
                     .tag(Tab.search)
                     .tabItem {Tab.search.tabContent}
                 
+                Maps()
+                    .tag(Tab.maps)
+                    .tabItem {Tab.maps.tabContent}
+                
                 Graphs()
                     .tag(Tab.charts)
                     .tabItem {Tab.charts.tabContent}
