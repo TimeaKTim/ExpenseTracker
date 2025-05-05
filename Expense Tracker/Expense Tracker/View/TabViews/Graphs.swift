@@ -53,9 +53,6 @@ struct Graphs: View {
                     case .category:
                         CategoryChart()
                         .transition(.opacity.combined(with: .move(edge: .trailing)))
-                    case .yearly:
-                        YearlyCategoryTrendChart()
-                        .transition(.opacity.combined(with: .move(edge: .trailing)))
                 }
             }
             .navigationTitle("Graphs")
@@ -64,15 +61,12 @@ struct Graphs: View {
     }
     
     @ViewBuilder
-    func YearlyCategoryTrendChart() -> some View {
-        
-    }
-    
-    @ViewBuilder
     func CategoryChart() -> some View {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 VStack(spacing: 10) {
+                    Text(format(date: selectedMonth, format: "MMM yyyy"))
+                        .font(.title3.bold())
                     Text(currencyString(totalExpenseForMonth, allowedDigits: 1, currencyCode: Locale.current.currencySymbol ?? "RON"))
                         .font(.title3.bold())
                         .multilineTextAlignment(.center)
