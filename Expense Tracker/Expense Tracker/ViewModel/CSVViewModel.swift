@@ -43,14 +43,17 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
     }
     
     func extractFirstNumber(from text: String) -> String? {
-            let pattern = #"\d+(\.\d+)?"#
-            if let regex = try? NSRegularExpression(pattern: pattern),
-               let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)) {
-                let range = Range(match.range, in: text)
-                return range.map { String(text[$0]) }
+        let cleanedText = text.replacingOccurrences(of: ",", with: "")
+        let pattern = #"\d+\.\d+"#
+            
+        if let regex = try? NSRegularExpression(pattern: pattern),
+           let match = regex.firstMatch(in: cleanedText, range: NSRange(cleanedText.startIndex..., in: cleanedText)) {
+            if let range = Range(match.range, in: cleanedText) {
+                return String(cleanedText[range])
             }
-            return nil
         }
+        return nil
+    }
     
     func extractPDFText(from url: URL, context: ModelContext) async{
         guard let document = PDFDocument(url: url) else { return }
@@ -58,25 +61,37 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
         let dateRegex = try! NSRegularExpression(pattern: #"^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+\d{1,2},\s+\d{4}"#)
         let fromToRegex = try! NSRegularExpression(pattern: #"^(To|From):"#)
         let amountLineRegex = try! NSRegularExpression(pattern: #"(\d{1,3}(,\d{3})*(\.\d+)?\s*\w{3})\s+(\d{1,3}(,\d{3})*(\.\d+)?\s*\w{3})"#)
+        let currencyRegex = try! NSRegularExpression(pattern: #"\b([A-Z]{3}) Statement\b"#)
 
         var currentDate: Date?
         var currentTitle: String = ""
         var currentAmount: Double = 0.0
         var currentRemarks: String = ""
         var currentCategory: Category = .expense
+        var currentCurrency: String = ""
 
         var extractedTransactions: [Transaction] = []
+        
+        let rates = await fetchAllExchangeRatesForLocalCurrency()
 
         for i in 0..<document.pageCount {
+            currentTitle = ""
+            currentAmount = 0.0
+            currentRemarks = ""
             guard let page = document.page(at: i),
                   let text = page.string else { continue }
 
             let lines = text.components(separatedBy: .newlines)
 
             for line in lines {
-//                print(line)
                 let lineRange = NSRange(location: 0, length: line.utf16.count)
 
+                if currencyRegex.firstMatch(in: line, range: lineRange) != nil {
+                    let parts = line.components(separatedBy: " ")
+                    currentCurrency = parts[0]
+                    print(currentCurrency)
+                }
+                
                 if dateRegex.firstMatch(in: line, range: lineRange) != nil {
                     let parts = line.components(separatedBy: " ")
                     let cleanedParts = parts.prefix(3).map { $0.replacingOccurrences(of: ",", with: "") }
@@ -87,12 +102,24 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                     if let number = extractFirstNumber(from: remaining),
                        let amount = Double(number) {
                         currentAmount = amount
-                        if let range = remaining.range(of: number) {
-                            currentTitle = String(remaining[..<range.lowerBound]).trimmingCharacters(in: .whitespaces)
+                        
+                        if currentCurrency != Locale.current.currency?.identifier {
+                            if let rate = rates?[currentCurrency] {
+                                currentAmount /= rate
+                            } else {
+                                print("⚠️ Missing exchange rate for currency: \(currentCurrency)")
+                            }
+                        }
+
+                        let originalNumberRegex = try! NSRegularExpression(pattern: #"\d{1,3}(,\d{3})*(\.\d+)?"#)
+                        if let match = originalNumberRegex.firstMatch(in: remaining, range: NSRange(remaining.startIndex..., in: remaining)),
+                           let matchRange = Range(match.range, in: remaining) {
+                            currentTitle = String(remaining[..<matchRange.lowerBound]).trimmingCharacters(in: .whitespaces)
                         } else {
                             currentTitle = remaining
                         }
                     }
+
                     if currentTitle == "" {
                         if let referenceRange = remaining.range(of: "Reference:") {
                             let firstPart = remaining[..<referenceRange.lowerBound].trimmingCharacters(in: .whitespaces)
@@ -124,7 +151,7 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                 }
                 
 //                print(currentTitle, currentAmount, currentRemarks)
-                if currentAmount != 0.0 && currentTitle != "" && currentRemarks != ""{
+                if currentAmount != 0.0 && currentTitle != ""{
                     let newTransaction = Transaction(
                         title: currentTitle,
                         remarks: currentRemarks,
@@ -137,7 +164,7 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                         originalCurrency: "RON"
                     )
                     
-//                    print(newTransaction.title, newTransaction.amount, newTransaction.remarks, newTransaction.category, newTransaction.dateAdded)
+                    print(newTransaction.title, newTransaction.amount, newTransaction.remarks, newTransaction.category, newTransaction.dateAdded)
                     
                     extractedTransactions.append(newTransaction)
                     
