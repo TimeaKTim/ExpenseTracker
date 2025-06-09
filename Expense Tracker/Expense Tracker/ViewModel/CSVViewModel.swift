@@ -31,10 +31,19 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
             if fileExtension == "csv" {
                 readFile(url, context: context)
             } else if fileExtension == "pdf" {
-                Task {
+                let fileName = url.lastPathComponent.lowercased()
+                
+                if fileName.contains("martie") && fileName.contains("iunie 2025") {
+                    Task {
+                        await self.printPDFContents(from: url, context: context)
+                    }
+                } else {
+                    Task {
                         await self.extractPDFText(from: url, context: context)
                     }
-            } else {
+                }
+            }
+ else {
                 print("Unsupported file type: \(fileExtension)")
             }
         case .failure(let error):
@@ -53,6 +62,168 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
             }
         }
         return nil
+    }
+    
+    func printPDFContents(from url: URL, context: ModelContext) async{
+        var currentAmount: Double = 0.0
+        var currentTitle: String = ""
+        var currentCategory: Category = .expense
+        var currentDate: Date = .now
+        var hasTitle: Bool = false
+        var extractedTransactions: [Transaction] = []
+        
+        guard let document = PDFDocument(url: url) else { return }
+
+        let datePattern = #"^\d{2}/\d{2}/\d{4}"#
+        let dateRegex = try? NSRegularExpression(pattern: datePattern)
+
+        let numberOnlyPattern = #"^\s*\d{1,3}(,\d{3})*(\.\d+)?\s*$"#
+        let numberOnlyRegex = try? NSRegularExpression(pattern: numberOnlyPattern)
+
+        var refCounter: Int? = nil
+
+        for i in 0..<document.pageCount {
+            guard let page = document.page(at: i),
+                  let text = page.string else { continue }
+
+            let lines = text.components(separatedBy: .newlines)
+            var collectNextLine = false
+
+            for line in lines {
+                
+                if currentDate != .now && currentTitle != "" && currentAmount != 0.0 {
+                    let posPattern = #"^(POS|EPOS) \d{2}/\d{2}/\d{4} .*?TID[: ]\S+\s*"#
+                    if let posRegex = try? NSRegularExpression(pattern: posPattern, options: []) {
+                        let range = NSRange(location: 0, length: currentTitle.utf16.count)
+                        if let match = posRegex.firstMatch(in: currentTitle, options: [], range: range) {
+                            let matchedRange = match.range
+                            if let swiftRange = Range(matchedRange, in: currentTitle) {
+                                currentTitle.removeSubrange(swiftRange)
+                                currentTitle = currentTitle.trimmingCharacters(in: .whitespaces)
+                            }
+                        }
+                    }
+
+                    let newTransaction = Transaction(
+                        title: currentTitle,
+                        remarks: "",
+                        amount: currentAmount,
+                        dateAdded: currentDate,
+                        category: currentCategory,
+                        shopCategory: "",
+                        tintColor: tint,
+                        originalAmount: currentAmount,
+                        originalCurrency: "RON"
+                    )
+                    extractedTransactions.append(newTransaction)
+                    print(currentDate, currentTitle, currentAmount, currentCategory)
+                    
+                    currentTitle = ""
+                    currentAmount = 0.0
+                    hasTitle = false
+                }
+                
+                let range = NSRange(location: 0, length: line.utf16.count)
+
+                if line.uppercased().hasPrefix("REF") {
+                    refCounter = 3
+                    continue
+                }
+
+                if let count = refCounter {
+                    refCounter = count - 1
+                    if refCounter == 2 {
+                        let isNumberOnlyLine = numberOnlyRegex?.firstMatch(in: line, options: [], range: range) != nil
+                        if isNumberOnlyLine {
+                            let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+                            let withoutSeparators = trimmedLine.replacingOccurrences(of: ",", with: "")
+                            if let amount = Double(withoutSeparators) {
+                                if(currentAmount == 0.0){
+                                    currentAmount = amount
+                                }
+                            } else {
+                                print("Hiba: nem sikerült Double-é konvertálni a sort: \(line)")
+                            }
+                        }
+                    }
+
+                    if refCounter == 0 {
+                        if !line.contains("SOLD FINAL ZI") && currentTitle == "" {
+                            currentTitle = line
+                            hasTitle = true
+                        }
+                        refCounter = nil
+                    }
+                    continue
+                }
+
+                let isDateLine = dateRegex?.firstMatch(in: line, options: [], range: range) != nil
+
+                if isDateLine {
+                    if line.contains("RULAJ ZI") || line.contains("RULAJ TOTAL CONT") {
+                        continue
+                    }
+
+                    let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+                    let components = trimmedLine.components(separatedBy: " ")
+
+                    if let dateString = components.first {
+                        let dateFormatter = DateFormatter()
+                        dateFormatter.dateFormat = "dd/MM/yyyy"
+                        dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+
+                        if let date = dateFormatter.date(from: dateString) {
+                            currentDate = date
+
+                            if components.count > 1 {
+                                let title = components.dropFirst().joined(separator: " ")
+                                if currentTitle == "" {
+                                    currentTitle = title
+                                }
+                                let firstWord = components.dropFirst().first?.lowercased() ?? ""
+                                if firstWord.hasPrefix("comision") || firstWord.hasPrefix("plata") {
+                                    currentCategory = .expense
+                                } else {
+                                    currentCategory = .income
+                                }
+                            }
+
+                        } else {
+                            print("⚠️ Nem sikerült dátummá alakítani: \(dateString)")
+                        }
+                    }
+
+                    collectNextLine = true
+                    continue
+                }
+
+
+                if collectNextLine && !hasTitle{
+                    currentTitle = line
+                    collectNextLine = false
+                    continue
+                }
+            }
+        }
+        
+        let allStores = await shopViewModel.fetchAllStores()
+        let storeDict = Dictionary(uniqueKeysWithValues: allStores.map { ($0.title, $0) })
+
+        for transaction in extractedTransactions {
+
+            if let store = storeDict[transaction.title] {
+                transaction.shopCategory = store.category
+                context.insert(transaction)
+            } else {
+                await MainActor.run {
+                    self.transactions.append(transaction)
+                }
+            }
+        }
+
+        await MainActor.run {
+            self.isCategoryPickerPresented = !self.transactions.isEmpty
+        }
     }
     
     func extractPDFText(from url: URL, context: ModelContext) async{
@@ -84,6 +255,7 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
             let lines = text.components(separatedBy: .newlines)
 
             for line in lines {
+                print(line)
                 let lineRange = NSRange(location: 0, length: line.utf16.count)
 
                 if currencyRegex.firstMatch(in: line, range: lineRange) != nil {
@@ -132,8 +304,10 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                         .replacingOccurrences(of: "To:", with: "")
                         .replacingOccurrences(of: "From:", with: "")
                         .trimmingCharacters(in: .whitespaces)
-
+                    
+                    print(line)
                     currentCategory = line.hasPrefix("To:") ? .expense : .income
+                    print(currentCategory)
                 } else if amountLineRegex.firstMatch(in: line, range: lineRange) != nil && currentAmount == 0.0 && currentTitle != ""{
                     if let amountMatch = amountLineRegex.firstMatch(in: line, range: lineRange) {
                         let amountString = (line as NSString).substring(with: amountMatch.range(at: 1))
@@ -150,7 +324,7 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
                     currentRemarks = "-"
                 }
                 
-//                print(currentTitle, currentAmount, currentRemarks)
+                print(currentTitle, currentAmount, currentRemarks)
                 if currentAmount != 0.0 && currentTitle != ""{
                     let newTransaction = Transaction(
                         title: currentTitle,
@@ -187,7 +361,7 @@ class CSVViewModel: ObservableObject, @unchecked Sendable {
         for transaction in extractedTransactions {
             let key = TransactionKey(title: transaction.title, amount: transaction.amount, date: transaction.dateAdded, category: transaction.category)
             if transactionSet.contains(key) && !key.title.hasPrefix("Exchanged") && !key.title.hasPrefix("Transfer") && !key.title.hasPrefix("BudapestGO"){
-//                print(key.title, key.amount, key.date, key.category)
+                print(key.title, key.amount, key.date, key.category)
                 print("🟡 Duplikált tranzakció kihagyva: \(transaction.title)")
                 continue
             }

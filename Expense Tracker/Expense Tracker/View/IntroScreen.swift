@@ -12,7 +12,7 @@ struct IntroScreen: View {
     @AppStorage("isFirstTime") private var isFirstTime: Bool = true
     var body: some View {
         VStack(spacing:15){
-            Text("What's New in the\nExpense Tracker")
+            Text("What's New in \nMyExpenses")
                 .font(.largeTitle.bold())
                 .multilineTextAlignment(.center)
                 .padding(.top, 65)
@@ -25,6 +25,8 @@ struct IntroScreen: View {
                 PointView(symbol: "chart.bar.fill", title: "Visual Charts", subTitle: "View your transactions using eye-catching graphic representations.")
                 
                 PointView(symbol: "magnifyingglass", title: "Advanced Filters", subTitle: "Find the expenses you want by advanced search and filtering.")
+                
+                PointView(symbol: "map", title: "ATM Map", subTitle: "Find the nearest ATMs in your area.")
             })
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 15)

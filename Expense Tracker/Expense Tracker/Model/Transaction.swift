@@ -10,7 +10,6 @@ import SwiftData
 
 @Model
 class Transaction: @unchecked Sendable, Identifiable {
-    /// Properties
     var title: String
     var remarks: String
     var amount: Double

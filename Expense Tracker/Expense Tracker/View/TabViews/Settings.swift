@@ -7,7 +7,6 @@
 
 import SwiftUI
 import UserNotifications
-import ActivityKit
 
 struct Settings: View {
     /// User Properties
@@ -15,8 +14,8 @@ struct Settings: View {
     /// App Lock Properties
     @AppStorage("isAppLockEnabled") private var isAppLockEnabled: Bool = false
     @AppStorage("lockWhenAppGoesBackground") private var lockWhenAppGoesBackground: Bool = false
-    @State private var notificationEnabled = false
-    @State private var monthlyNotificationEnabled = false
+    @AppStorage("notificationEnabled") private var notificationEnabled: Bool = false
+    @AppStorage("monthlyNotificationEnabled") private var monthlyNotificationEnabled: Bool = false
     var body: some View {
         NavigationStack {
             List {

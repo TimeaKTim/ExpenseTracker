@@ -192,7 +192,7 @@ struct NewExpenseView: View {
                 Button {
                     isPresented.toggle()
                 } label: {
-                    Label("Import", systemImage: "square.and.arrow.down")
+                    Label("Import", systemImage: "square.and.arrow.up")
                 }
                 .fileImporter(isPresented: $isPresented, allowedContentTypes: [UTType.commaSeparatedText, UTType.pdf]) { result in
                     csvViewModel.handleFileImport(for: result, context: context)
