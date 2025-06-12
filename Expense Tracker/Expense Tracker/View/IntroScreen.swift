@@ -8,8 +8,7 @@
 import SwiftUI
 
 struct IntroScreen: View {
-    ///Visibility Status
-    @AppStorage("isFirstTime") private var isFirstTime: Bool = true
+    @State private var showTutorial = false
     var body: some View {
         VStack(spacing:15){
             Text("What's New in \nMyExpenses")
@@ -34,7 +33,7 @@ struct IntroScreen: View {
             Spacer(minLength: 10)
             
             Button(action: {
-                isFirstTime = false
+                showTutorial = true
             }, label: {
                 Text("Continue")
                 .fontWeight(.bold)
@@ -45,6 +44,9 @@ struct IntroScreen: View {
                 .contentShape(.rect)
             })
             .padding(15)
+            .fullScreenCover(isPresented: $showTutorial) {
+                TutorialScreen()
+            }
         }
     }
     

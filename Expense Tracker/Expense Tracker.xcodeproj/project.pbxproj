@@ -75,6 +75,7 @@
 				Model/TintColor.swift,
 				Model/Transaction.swift,
 				Model/TransactionKey.swift,
+				Model/TutorialPage.swift,
 				Model/YearlyCategoryAverage.swift,
 				View/Helpers/CardView.swift,
 				View/Helpers/FilterTransactionsView.swift,
